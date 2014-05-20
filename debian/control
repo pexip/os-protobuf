@@ -5,10 +5,10 @@ Maintainer: Pexip AS <packaging@pexip.com>
 XSBC-Pexip-Original-Maintainer: Robert S. Edmonds <edmonds@debian.org>
 XSBC-Pexip-Original-Uploaders: Iustin Pop <iustin@debian.org>
 Build-Depends: dpkg-dev (>=1.16.1~), debhelper (>= 9),
- g++ (>= 4:4.7),
+ g++ (>= 4:4.6),
  python (>= 2.6.6-3~),
  python-setuptools (>= 0.6c9), xmlto, ant, zlib1g-dev,
- default-jdk, unzip, dh-python,
+ default-jdk, unzip,
  maven-repo-helper, dh-autoreconf
 Standards-Version: 3.9.5
 Homepage: https://code.google.com/p/protobuf/
