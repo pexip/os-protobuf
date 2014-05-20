@@ -1,3 +1,9 @@
+protobuf (2.5.0-9pexip1) pexip; urgency=low
+
+  * Prepare Pexip packaging
+
+ -- Ben Hockley <ben@pexip.com>  Tue, 20 May 2014 09:44:46 +0000
+
 protobuf (2.5.0-9) unstable; urgency=medium
 
   * Upload to unstable.
