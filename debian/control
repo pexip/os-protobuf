@@ -2,22 +2,44 @@ Source: protobuf
 Section: devel
 Priority: optional
 Maintainer: Pexip AS <packaging@pexip.com>
-XSBC-Pexip-Original-Maintainer: Robert S. Edmonds <edmonds@debian.org>
-XSBC-Pexip-Original-Uploaders: Iustin Pop <iustin@debian.org>
-Build-Depends: dpkg-dev (>=1.16.1~), debhelper (>= 9),
- g++ (>= 4:4.6),
- python (>= 2.6.6-3~),
- python-setuptools (>= 0.6c9), xmlto, ant, zlib1g-dev,
- default-jdk, unzip,
- maven-repo-helper, dh-autoreconf
-Standards-Version: 3.9.5
-Homepage: https://code.google.com/p/protobuf/
-Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/protobuf.git
-Vcs-Git: git://anonscm.debian.org/collab-maint/protobuf.git
+XSBC-Pexip-Original-Maintainer: Debian protobuf maintainers <pkg-protobuf-devel@lists.alioth.debian.org>
+XSBC-Pexip-Original-Uploaders:
+ Robert Edmonds <edmonds@debian.org>,
+ Iustin Pop <iustin@debian.org>,
+ Laszlo Boszormenyi (GCS) <gcs@debian.org>,
+ Andrew Pollock <apollock@debian.org>
+Build-Depends:
+# Debian build system
+ dpkg-dev (>= 1.16.1~)
+ , debhelper (>= 9)
+ , dh-autoreconf
+# C/C++
+ , g++ (>= 4:4.7)
+ , zlib1g-dev
+ , google-mock
+# Python
+ , dh-python
+ , python-all (>= 2.7)
+ , libpython-all-dev (>= 2.7)
+ , python-setuptools
+ , python-google-apputils
+# Manpage generator
+ , xmlto
+# Tests
+ , unzip
+Build-Depends-Indep:
+# Java
+ , ant
+ , default-jdk
+ , maven-repo-helper
+Standards-Version: 3.9.8
+Homepage: https://github.com/google/protobuf/
+Vcs-Browser: https://anonscm.debian.org/cgit/pkg-protobuf/pkg-protobuf.git
+Vcs-Git: https://anonscm.debian.org/git/pkg-protobuf/pkg-protobuf.git
 X-Python-Version: >= 2.7
 XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
 
-Package: libprotobuf8
+Package: libprotobuf10
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -36,7 +58,7 @@ Description: protocol buffers C++ library
  .
  This package contains the runtime library needed for C++ applications.
 
-Package: libprotobuf-lite8
+Package: libprotobuf-lite10
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -60,8 +82,8 @@ Package: libprotobuf-dev
 Architecture: any
 Multi-Arch: same
 Section: libdevel
-Depends: ${shlibs:Depends}, ${misc:Depends}, zlib1g-dev,
- libprotobuf8 (= ${binary:Version}), libprotobuf-lite8 (= ${binary:Version})
+Depends: ${misc:Depends}, zlib1g-dev,
+ libprotobuf10 (= ${binary:Version}), libprotobuf-lite10 (= ${binary:Version})
 Description: protocol buffers C++ library (development files)
  Protocol buffers are a flexible, efficient, automated mechanism for
  serializing structured data - similar to XML, but smaller, faster, and
@@ -77,7 +99,7 @@ Description: protocol buffers C++ library (development files)
  This package contains the development headers and static libraries needed for
  writing C++ applications.
 
-Package: libprotoc8
+Package: libprotoc10
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -101,8 +123,8 @@ Package: libprotoc-dev
 Architecture: any
 Multi-Arch: same
 Section: libdevel
-Depends: ${shlibs:Depends}, ${misc:Depends},
- libprotoc8 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
+Depends: ${misc:Depends},
+ libprotoc10 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
 Replaces: libprotobuf-dev (<< 2.1.0)
 Breaks: libprotobuf-dev (<< 2.1.0)
 Description: protocol buffers compiler library (development files)
@@ -123,7 +145,7 @@ Description: protocol buffers compiler library (development files)
 Package: protobuf-compiler
 Architecture: any
 Multi-Arch: foreign
-Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc8 (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc10 (= ${binary:Version})
 Description: compiler for protocol buffer definition files
  Protocol buffers are a flexible, efficient, automated mechanism for
  serializing structured data - similar to XML, but smaller, faster, and
@@ -141,9 +163,9 @@ Description: compiler for protocol buffer definition files
  binding for the supported languages.
 
 Package: python-protobuf
-Architecture: all
+Architecture: any
 Section: python
-Depends: ${python:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${python:Depends}, ${misc:Depends}
 Description: Python bindings for protocol buffers
  Protocol buffers are a flexible, efficient, automated mechanism for
  serializing structured data - similar to XML, but smaller, faster, and
@@ -163,7 +185,7 @@ Description: Python bindings for protocol buffers
 
 Package: libprotobuf-java
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${misc:Depends}
 Section: java
 Description: Java bindings for protocol buffers
  Protocol buffers are a flexible, efficient, automated mechanism for
