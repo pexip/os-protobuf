@@ -22,7 +22,7 @@ Build-Depends:
  , python-all (>= 2.7)
  , libpython-all-dev (>= 2.7)
  , python-setuptools
- , python-google-apputils
+# , python-google-apputils
 # Manpage generator
  , xmlto
 # Tests
