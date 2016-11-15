@@ -15,7 +15,7 @@ Homepage: https://code.google.com/p/protobuf/
 Vcs-Browser: http://anonscm.debian.org/gitweb/?p=collab-maint/protobuf.git
 Vcs-Git: git://anonscm.debian.org/collab-maint/protobuf.git
 X-Python-Version: >= 2.7
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ jessie
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
 
 Package: libprotobuf8
 Architecture: any
