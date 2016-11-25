@@ -5,3 +5,4 @@ java-test-scope.patch
 misleading-indentation.patch
 s390x.patch
 sparc64.patch
+python3_long_fix.patch
