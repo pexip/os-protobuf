@@ -1,7 +1,8 @@
 #!/usr/bin/make -f
+# -*- makefile -*-
 
 %:
-	dh $@ --with autoreconf,python2 --parallel
+	dh $@ --with autoreconf,python2,python3 --parallel
 
 override_dh_auto_build-arch:
 ## Chicken<->Egg problem: protobuf requires self-generated .pb.go files to
@@ -14,8 +15,10 @@ override_dh_auto_build-arch:
 	# Generate the manpage.
 	xmlto man debian/protoc.xml
 
-	# Python build.
+	# Python and Python3 build.
+	cp -rv python python3
 	cd python && python setup.py build --cpp_implementation
+	cd python3 && python3 setup.py build --cpp_implementation
 
 override_dh_auto_build-indep:
 	dh_auto_build --indep
@@ -42,8 +45,14 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	# Python test.
 	set -e; \
 	export LD_LIBRARY_PATH=$(CURDIR)/src/.libs; \
-	cd python && for python in $(shell pyversions -r); do \
-		$$python setup.py test --cpp_implementation; \
+	cd python && for PYTHON in $(shell pyversions -r); do \
+		$$PYTHON setup.py test --cpp_implementation; \
+	done
+    # Python3 test.
+	set -e; \
+	export LD_LIBRARY_PATH=$(CURDIR)/src/.libs; \
+	cd python3 && for PYTHON in $(shell py3versions -r); do \
+		$$PYTHON setup.py test --cpp_implementation; \
 	done
 endif
 
@@ -58,6 +67,8 @@ override_dh_auto_clean-arch:
 		$$python setup.py clean --all; \
 	done
 	rm -rf python/protobuf.egg-info
+	# Python3 clean.
+	rm -rf python3
 
 override_dh_auto_clean-indep:
 	dh_auto_clean --indep
@@ -77,6 +88,14 @@ override_dh_auto_install-arch:
 			--root=$(CURDIR)/debian/python-protobuf; \
 	done
 	find $(CURDIR)/debian/python-protobuf -name 'protobuf-*-nspkg.pth' -delete
+
+	# Python3 install.
+	cd python3 && for python in $(shell py3versions -r); do \
+		$$python setup.py install --cpp_implementation \
+			--install-layout=deb --no-compile \
+			--root=$(CURDIR)/debian/python3-protobuf; \
+	done
+	find $(CURDIR)/debian/python3-protobuf -name 'protobuf-*-nspkg.pth' -delete
 
 override_dh_auto_install-indep:
 	dh_auto_install --indep
