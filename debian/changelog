@@ -32,7 +32,6 @@ protobuf (3.0.0-7pexip2) pexip; urgency=low
 protobuf (3.0.0-7pexip1) pexip; urgency=low
 
   * New upstream release; migrate to stretch
-  * debian/control: relax build dependencies
 
  -- John-Mark Bell <jmb@pexip.com>  Tue, 15 Nov 2016 09:18:37 +0000
 

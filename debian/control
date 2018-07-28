@@ -26,7 +26,7 @@ Build-Depends:
  , libpython3-all-dev (>= 3.3)
  , python-setuptools
  , python3-setuptools
-# , python-google-apputils
+ , python-google-apputils
  , python3-six
 # Manpage generator
  , xmlto
