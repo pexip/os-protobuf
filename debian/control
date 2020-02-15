@@ -42,7 +42,7 @@ Homepage: https://github.com/google/protobuf/
 Vcs-Browser: https://anonscm.debian.org/cgit/pkg-protobuf/pkg-protobuf.git
 Vcs-Git: https://anonscm.debian.org/git/pkg-protobuf/pkg-protobuf.git
 X-Python-Version: >= 2.7
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ stretch
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ buster
 
 Package: libprotobuf10
 Architecture: any
