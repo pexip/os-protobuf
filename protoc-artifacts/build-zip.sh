@@ -1,26 +1,32 @@
 #!/bin/bash
 
-if [ $# -eq 0 ]; then
+if [ $# -ne 2 ]; then
   cat <<EOF
-Usage: $0 <VERSION_NUMBER>
+Usage: $0 <TARGET> <VERSION_NUMBER>
+
+TARGET: protoc | protoc-gen-javalite
 
 Example:
-  $ $0 3.0.0-beta-4
+  $ $0 protoc 3.0.0
+  $ $0 protoc-gen-javalite 3.0.0
 
-This script will download pre-built protoc binaries from maven repository
-and package them with well-known type .proto files to create .zip packages
-suitable to be included in the github release page. Each invocation will
-create 5 zip packages:
-  dist/protoc-<VERSION_NUMBER>-win32.zip
-  dist/protoc-<VERSION_NUMBER>-osx-x86_32.zip
-  dist/protoc-<VERSION_NUMBER>-osx-x86_64.zip
-  dist/protoc-<VERSION_NUMBER>-linux-x86_32.zip
-  dist/protoc-<VERSION_NUMBER>-linux-x86_64.zip
+This script will download pre-built protoc or protoc plugin binaries from maven
+repository and create .zip packages suitable to be included in the github
+release page. If the target is protoc, well-known type .proto files will also be
+included. Each invocation will create 7 zip packages:
+  dist/<TARGET>-<VERSION_NUMBER>-win32.zip
+  dist/<TARGET>-<VERSION_NUMBER>-osx-x86_32.zip
+  dist/<TARGET>-<VERSION_NUMBER>-osx-x86_64.zip
+  dist/<TARGET>-<VERSION_NUMBER>-linux-x86_32.zip
+  dist/<TARGET>-<VERSION_NUMBER>-linux-x86_64.zip
+  dist/<TARGET>-<VERSION_NUMBER>-linux-aarch_64.zip
+  dist/<TARGET>-<VERSION_NUMBER>-linux-ppcle_64.zip
 EOF
   exit 1
 fi
 
-VERSION_NUMBER=$1
+TARGET=$1
+VERSION_NUMBER=$2
 
 # <zip file name> <binary file name> pairs.
 declare -a FILE_NAMES=( \
@@ -29,6 +35,8 @@ declare -a FILE_NAMES=( \
   osx-x86_64.zip osx-x86_64.exe \
   linux-x86_32.zip linux-x86_32.exe \
   linux-x86_64.zip linux-x86_64.exe \
+  linux-aarch_64.zip linux-aarch_64.exe \
+  linux-ppcle_64.zip linux-ppcle_64.exe \
 )
 
 # List of all well-known types to be included.
@@ -69,6 +77,10 @@ compiler (protoc). This binary is intended for users who want to use Protocol
 Buffers in languages other than C++ but do not want to compile protoc
 themselves. To install, simply place this binary somewhere in your PATH.
 
+If you intend to use the included well known types then don't forget to
+copy the contents of the 'include' directory somewhere as well, for example
+into '/usr/local/include/'.
+
 Please refer to our official github site for more installation instructions:
   https://github.com/google/protobuf
 EOF
@@ -78,17 +90,27 @@ mkdir -p ${DIR}/bin
 # Create a zip file for each binary.
 for((i=0;i<${#FILE_NAMES[@]};i+=2));do
   ZIP_NAME=${FILE_NAMES[$i]}
+  if [ ${ZIP_NAME:0:3} = "win" ]; then
+    BINARY="$TARGET.exe"
+  else
+    BINARY="$TARGET"
+  fi
   BINARY_NAME=${FILE_NAMES[$(($i+1))]}
-  BINARY_URL=http://repo1.maven.org/maven2/com/google/protobuf/protoc/${VERSION_NUMBER}/protoc-${VERSION_NUMBER}-${BINARY_NAME}
-  if ! wget ${BINARY_URL} -O ${DIR}/bin/protoc &> /dev/null; then
+  BINARY_URL=http://repo1.maven.org/maven2/com/google/protobuf/$TARGET/${VERSION_NUMBER}/$TARGET-${VERSION_NUMBER}-${BINARY_NAME}
+  if ! wget ${BINARY_URL} -O ${DIR}/bin/$BINARY &> /dev/null; then
     echo "[ERROR] Failed to download ${BINARY_URL}" >&2
-    echo "[ERROR] Skipped protoc-${VERSION_NAME}-${ZIP_NAME}" >&2
+    echo "[ERROR] Skipped $TARGET-${VERSION_NAME}-${ZIP_NAME}" >&2
     continue
   fi
-  TARGET_ZIP_FILE=`pwd`/dist/protoc-${VERSION_NUMBER}-${ZIP_NAME}
+  TARGET_ZIP_FILE=`pwd`/dist/$TARGET-${VERSION_NUMBER}-${ZIP_NAME}
   pushd $DIR &> /dev/null
-  chmod +x bin/protoc
-  zip -r ${TARGET_ZIP_FILE} include bin readme.txt &> /dev/null
+  chmod +x bin/$BINARY
+  if [ "$TARGET" = "protoc" ]; then
+    zip -r ${TARGET_ZIP_FILE} include bin readme.txt &> /dev/null
+  else
+    zip -r ${TARGET_ZIP_FILE} bin &> /dev/null
+  fi
+  rm  bin/$BINARY
   popd &> /dev/null
   echo "[INFO] Successfully created ${TARGET_ZIP_FILE}"
 done
