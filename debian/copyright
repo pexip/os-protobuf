@@ -6,7 +6,7 @@ Comment:
  on Mon, 07 Jul 2008 17:48:21 +0200.
 
 Files: *
-Copyright: 2008-2016 Google Inc.
+Copyright: 2008-2018 Google Inc.
 License: BSD-3-Clause~Google
 
 Files:
@@ -31,7 +31,7 @@ License: GPLWithACException
  Public License when using or distributing such scripts.
  .
  On Debian systems, the complete text of the GNU General Public
- License can be found in "/usr/share/common-licenses/GPL".
+ License can be found in "/usr/share/common-licenses/GPL-2".
 Comment:
  Unspecified GPL, assuming any version as per text of the GPL-2 license:
    "If the Program does not specify a version number of this License, you may
@@ -51,10 +51,10 @@ Files: debian/*
 Copyright:
     2009      Dirk Eddelbuettel <edd@debian.org>
     2016      Dmitry Smirnov <onlyjob@debian.org>
-    2016      Laszlo Boszormenyi (GCS) <gcs@debian.org>
     2009      Julien Cristau <jcristau@debian.org>
     2013-2014 Robert Edmonds <edmonds@debian.org>
     2008,2009,2010 Iustin Pop <iusty@k1024.org>
+    2016-     Laszlo Boszormenyi (GCS) <gcs@debian.org>
 License: GPL-3
 
 License: Public-Domain
@@ -172,7 +172,7 @@ License: Apache-2.0
  you may not use this file except in compliance with the License.
  You may obtain a copy of the License at
  ․
-    http://www.apache.org/licenses/LICENSE-2.0
+    https://www.apache.org/licenses/LICENSE-2.0
  ․
  Unless required by applicable law or agreed to in writing, software
  distributed under the License is distributed on an "AS IS" BASIS,

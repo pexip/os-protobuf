@@ -16,7 +16,18 @@
         <exec executable="${srcdir}/protoc">
             <arg value="--java_out=${generateddir}" />
             <arg value="--proto_path=${srcdir}" />
+            <arg value="${srcdir}/google/protobuf/any.proto" />
+            <arg value="${srcdir}/google/protobuf/api.proto" />
             <arg value="${srcdir}/google/protobuf/descriptor.proto" />
+            <arg value="${srcdir}/google/protobuf/duration.proto" />
+            <arg value="${srcdir}/google/protobuf/empty.proto" />
+            <arg value="${srcdir}/google/protobuf/field_mask.proto" />
+            <arg value="${srcdir}/google/protobuf/source_context.proto" />
+            <arg value="${srcdir}/google/protobuf/struct.proto" />
+            <arg value="${srcdir}/google/protobuf/timestamp.proto" />
+            <arg value="${srcdir}/google/protobuf/type.proto" />
+            <arg value="${srcdir}/google/protobuf/wrappers.proto" />
+	    <arg value="${srcdir}/google/protobuf/compiler/plugin.proto" />
         </exec>
     </target>
 
