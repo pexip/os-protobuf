@@ -1,8 +1,6 @@
-diff --git a/python/google/protobuf/json_format.py b/python/google/protobuf/json_format.py
-index bb6a199..f760dc3 100644
 --- a/python/google/protobuf/json_format.py
 +++ b/python/google/protobuf/json_format.py
-@@ -427,13 +427,23 @@ class _Parser(object):
+@@ -536,8 +536,13 @@
                if item is None:
                  raise ParseError('null is not allowed to be used as an element'
                                   ' in a repeated field.')
@@ -16,7 +14,10 @@ index bb6a199..f760dc3 100644
 +                    not self.ignore_unknown_fields):
 +                  raise e
          elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_MESSAGE:
-           sub_message = getattr(message, field.name)
+           if field.is_extension:
+             sub_message = message.Extensions[field]
+@@ -546,7 +551,12 @@
+           sub_message.SetInParent()
            self.ConvertMessage(value, sub_message)
          else:
 -          setattr(message, field.name, _ConvertScalarFieldValue(value, field))
