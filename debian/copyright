@@ -9,18 +9,9 @@ Files: *
 Copyright: 2008-2018 Google Inc.
 License: BSD-3-Clause~Google
 
-Files:
-    src/google/protobuf/stubs/atomicops_internals_power.h
-Copyright: 2014 Bloomberg Finance LP
-License: BSD-3-Clause~Bloomberg
-
-Files:
-    src/google/protobuf/stubs/atomicops_internals_generic_gcc.h
-Copyright: 2013 Red Hat Inc
-License: BSD-3-Clause~RedHat
-
-Files: m4/acx_pthread.m4
+Files: m4/ax_pthread.m4
 Copyright: 2006 Steven G. Johnson <stevenj@alum.mit.edu>
+           2011 Daniel Richard G. <skunk@iSKUNK.ORG>
 License: GPLWithACException
  This program is free software; you can redistribute it and/or modify it
  under the terms of the GNU General Public License as published by the Free
@@ -113,60 +104,6 @@ Comment:
  standalone and requires a support library to be linked with it.
  This support library is itself covered by the above license.
 
-License: BSD-3-Clause~Bloomberg
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are
- met:
- .
-     * Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
-     * Redistributions in binary form must reproduce the above
-       copyright notice, this list of conditions and the following disclaimer
-       in the documentation and/or other materials provided with the
-       distribution.
-     * Neither the name of Bloomberg Finance LP. nor the names of its
-       contributors may be used to endorse or promote products derived from
-       this software without specific prior written permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-License: BSD-3-Clause~RedHat
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are
- met:
- .
-     * Redistributions of source code must retain the above copyright
-       notice, this list of conditions and the following disclaimer.
-     * Redistributions in binary form must reproduce the above
-       copyright notice, this list of conditions and the following disclaimer
-       in the documentation and/or other materials provided with the
-       distribution.
-     * Neither the name of Red Hat Inc. nor the names of its
-       contributors may be used to endorse or promote products derived from
-       this software without specific prior written permission.
- .
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 License: Apache-2.0
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -180,8 +117,8 @@ License: Apache-2.0
  See the License for the specific language governing permissions and
  limitations under the License.
  ․
- On Debian systems, the complete text of the Apache License,
- Version 2.0 can be found in "/usr/share/common-licenses/Apache-2.0".
+ On Debian systems, the complete text of the Apache License, Version 2.0
+ can be found in the file `/usr/share/common-licenses/Apache-2.0'.
 
 License: GPL-3
  This program is free software: you can redistribute it and/or modify
@@ -193,5 +130,5 @@ License: GPL-3
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
  ․
- On Debian systems, the complete text of the GNU General Public
- License Version 3 can be found in "/usr/share/common-licenses/GPL-3".
+ On Debian systems, the complete text of the GNU General Public License
+ Version 3 can be found in the file `/usr/share/common-licenses/GPL-3'.

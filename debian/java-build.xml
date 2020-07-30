@@ -1,20 +1,32 @@
 <project name="protobuf-java" default="jar" basedir="..">
     <property name="srcdir" value="src" />
-    <property name="javadir" value="java/core" />
-    <property name="javasrcdir" value="${javadir}/src" />
-    <property name="targetdir" value="${javadir}/target" />
-    <property name="classesdir" value="${targetdir}/classes" />
-    <property name="generateddir" value="${targetdir}/generated-sources" />
+    <property name="javacoredir" value="java/core" />
+    <property name="javautildir" value="java/util" />
+    <property name="javacoresrcdir" value="${javacoredir}/src" />
+    <property name="javautilsrcdir" value="${javautildir}/src" />
+    <property name="coretargetdir" value="${javacoredir}/target" />
+    <property name="utiltargetdir" value="${javautildir}/target" />
+    <property name="coreclassesdir" value="${coretargetdir}/classes" />
+    <property name="utilclassesdir" value="${utiltargetdir}/classes" />
+    <property name="coregenerateddir" value="${coretargetdir}/generated-sources" />
+
+ <path id="util-classpath">
+   <fileset dir="/usr/share/java/">
+     <include name="gson.jar"/>
+     <include name="guava.jar"/>
+   </fileset>
+ </path>
 
     <target name="clean">
-        <delete dir="${targetdir}"/>
+        <delete dir="${coretargetdir}"/>
+        <delete dir="${utiltargetdir}"/>
     </target>
 
     <target name="generate">
-        <mkdir dir="${generateddir}" />
+        <mkdir dir="${coregenerateddir}" />
         <echo message="${srcdir}" />
         <exec executable="${srcdir}/protoc">
-            <arg value="--java_out=${generateddir}" />
+            <arg value="--java_out=${coregenerateddir}" />
             <arg value="--proto_path=${srcdir}" />
             <arg value="${srcdir}/google/protobuf/any.proto" />
             <arg value="${srcdir}/google/protobuf/api.proto" />
@@ -32,13 +44,25 @@
     </target>
 
     <target name="compile" depends="generate">
-        <mkdir dir="${classesdir}"/>
-        <javac srcdir="${generateddir}:${javasrcdir}/main/java"
-               destdir="${classesdir}" source="1.5" target="1.5"
+        <mkdir dir="${coreclassesdir}"/>
+        <javac srcdir="${coregenerateddir}:${javacoresrcdir}/main/java"
+               destdir="${coreclassesdir}" source="1.7" target="1.7"
+               includeantruntime="false" />
+    </target>
+
+    <target name="compile-util" depends="compile">
+        <mkdir dir="${utilclassesdir}"/>
+        <javac srcdir="${coregenerateddir}:${javacoresrcdir}/main/java:${javautilsrcdir}/main/java"
+               destdir="${utilclassesdir}" source="1.7" target="1.7"
+               classpathref="util-classpath"
                includeantruntime="false" />
     </target>
 
     <target name="jar" depends="compile">
-        <jar destfile="${targetdir}/protobuf.jar" basedir="${classesdir}" />
+        <jar destfile="${coretargetdir}/protobuf.jar" basedir="${coreclassesdir}" />
+    </target>
+
+    <target name="jar-util" depends="compile-util">
+        <jar destfile="${utiltargetdir}/protobuf-util.jar" basedir="${utilclassesdir}" />
     </target>
 </project>
