@@ -11,3 +11,4 @@ python3ify_examples.patch
 no_errorprone.patch
 
 unknown_enums.patch
+mock_compat.patch
