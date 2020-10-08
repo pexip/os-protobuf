@@ -20,7 +20,7 @@ endif
 SONAME=23
 
 %:
-	dh $@ --with autoreconf,elpa,python3
+	dh $@ --with autoreconf,python3
 
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 override_dh_auto_configure:
