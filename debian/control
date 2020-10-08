@@ -38,7 +38,7 @@ Homepage: https://github.com/google/protobuf/
 #Vcs-Git: https://anonscm.debian.org/git/pkg-protobuf/pkg-protobuf.git
 #X-Python-Version: >= 2.7
 XS-Ruby-Versions: all
-XS-Pexip-Upstream: http://ftp.debian.org/debian/ buster
+XS-Pexip-Upstream: http://ftp.debian.org/debian/ buster-backports
 
 Package: ruby-google-protobuf
 Architecture: linux-any
