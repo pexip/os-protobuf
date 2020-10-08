@@ -110,7 +110,7 @@ namespace Google.Protobuf
         /// <param name="settings">The settings.</param>
         public JsonParser(Settings settings)
         {
-            this.settings = settings;
+            this.settings = ProtoPreconditions.CheckNotNull(settings, nameof(settings));
         }
 
         /// <summary>
@@ -674,7 +674,7 @@ namespace Google.Protobuf
             if (value != Math.Floor(value))
             {
                 throw new InvalidProtocolBufferException($"Value not an integer: {value}");
-            }            
+            }
         }
 
         private static object ParseSingleStringValue(FieldDescriptor field, string text)
@@ -919,7 +919,7 @@ namespace Google.Protobuf
                 messagePaths.Add(ToSnakeCase(path));
             }
         }
-        
+
         // Ported from src/google/protobuf/util/internal/utility.cc
         private static string ToSnakeCase(string text)
         {
