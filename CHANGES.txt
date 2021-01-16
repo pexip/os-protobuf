@@ -1,28 +1,7 @@
-Unreleased Changes
+2020-07-09 version 3.12.4 (C++/Java/Python/PHP/Objective-C/C#/Ruby/JavaScript)
 
-  C++:
-  * Removed deprecated unsafe arena string accessors
-  * Enabled heterogeneous lookup for std::string keys in maps.
-  * Improved the randomness of map ordering.
-  * Removed implicit conversion from StringPiece to std::string
-  * Fix use-after-destroy bug when the Map is allocated in the arena.
-  * Improved the randomness of proto map ordering
-
-  Python:
-  * Reject lowercase t for Timestamp json format. Fixes a conformance test.
-  * Improved the error message when AttributeError is returned from __getattr__
-    in EnumTypeWrapper.
-
-  C#:
-  * Dropped support for netstandard1.0 (replaced by support for netstandard1.1).
-    This was required to modernize the parsing stack to use the `Span<byte>`
-    type internally. (#7351)
-  * Add `ParseFrom(ReadOnlySequence<byte>)` method to enable GC friendly
-    parsing with reduced allocations and buffer copies. (#7351)
-  * Add `GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE` define to make
-    generated code compatible with old C# compilers (pre-roslyn compilers
-    from .NET framework and old versions of mono) that do not support
-    ref structs. (#7490)
+  General
+  * Increment the patch version to ensure that all packages match.
 
 2020-06-01 version 3.12.3 (C++/Java/Python/PHP/Objective-C/C#/Ruby/JavaScript)
 

@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
-"http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+"https://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
 
 <!--
 
@@ -40,7 +40,7 @@ found in the docbook-xsl-doc-html package.
 Validation can be done using: `xmllint -noout -valid manpage.xml`
 
 General documentation about man-pages and man-page-formatting:
-man(1), man(7), http://www.tldp.org/HOWTO/Man-Page/
+man(1), man(7), https://www.tldp.org/HOWTO/Man-Page/
 
 -->
 
@@ -52,10 +52,10 @@ man(1), man(7), http://www.tldp.org/HOWTO/Man-Page/
   <!ENTITY dhemail     "iustin@debian.org">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1) and
-       http://www.tldp.org/HOWTO/Man-Page/q2.html. -->
+       https://www.tldp.org/HOWTO/Man-Page/q2.html. -->
   <!ENTITY dhsection   "1">
   <!-- TITLE should be something like "User commands" or similar (see
-       http://www.tldp.org/HOWTO/Man-Page/q2.html). -->
+       https://www.tldp.org/HOWTO/Man-Page/q2.html). -->
   <!ENTITY dhtitle     "protocol buffer compiler">
   <!ENTITY dhucpackage "protobuf">
   <!ENTITY dhpackage   "protoc">
@@ -207,8 +207,8 @@ man(1), man(7), http://www.tldp.org/HOWTO/Man-Page/
     which makes it hard to differentiante from scripts the actual
     error.</para>
 
-    <para>The upstreams <acronym>BTS</acronym> can be found at <ulink
-    url="http://code.google.com/p/protobuf/issues/list"/>.</para>
+    <para>The upstream <acronym>BTS</acronym> can be found at <ulink
+    url="https://github.com/protocolbuffers/protobuf/issues"/>.</para>
 
   </refsect1>
   <refsect1 id="see_also">
@@ -216,7 +216,7 @@ man(1), man(7), http://www.tldp.org/HOWTO/Man-Page/
 
     <para>More documentation about protocol buffers syntax and APIs is
     available online at <ulink
-    url="http://code.google.com/apis/protocolbuffers/docs/overview.html"></ulink>.</para>
+    url="https://developers.google.com/protocol-buffers/docs/overview"></ulink>.</para>
 
 
   </refsect1>

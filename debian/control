@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Build-Depends:
 # Debian build system
-   debhelper-compat (= 11)
+   debhelper-compat (= 12)
  , dh-elpa
 # C/C++
  , zlib1g-dev
@@ -30,8 +30,9 @@ Build-Depends-Indep:
  , maven-repo-helper
  , libguava-java
  , libgoogle-gson-java
-Standards-Version: 4.5.0
+Standards-Version: 4.5.1
 Homepage: https://github.com/google/protobuf/
+Rules-Requires-Root: no
 #Vcs-Browser: https://anonscm.debian.org/cgit/pkg-protobuf/pkg-protobuf.git
 #Vcs-Git: https://anonscm.debian.org/git/pkg-protobuf/pkg-protobuf.git
 #X-Python-Version: >= 2.7
@@ -107,6 +108,7 @@ Section: libdevel
 Depends: ${misc:Depends}, zlib1g-dev,
  libprotobuf23 (= ${binary:Version}), libprotobuf-lite23 (= ${binary:Version})
 Breaks: protobuf-compiler (<< ${binary:Version}), protobuf-compiler (>> ${binary:Version})
+Provides: protobuf-api-${pb:API}
 Description: protocol buffers C++ library (development files) and proto files
  Protocol buffers are a flexible, efficient, automated mechanism for
  serializing structured data - similar to XML, but smaller, faster, and

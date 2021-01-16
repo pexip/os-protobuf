@@ -18,6 +18,7 @@ export DEB_LDFLAGS_MAINT_APPEND  = -latomic
 endif
 
 SONAME=23
+API_VERSION=$(SONAME)-0
 
 %:
 	dh $@ --with autoreconf,elpa,python3
@@ -167,3 +168,6 @@ override_dh_installdocs-arch:
 override_dh_installdocs-indep:
 	dh_installdocs --indep
 	dh_installdocs -Xprotobuf-mode.el  # in protobuf-mode-el
+
+override_dh_gencontrol:
+	dh_gencontrol -- -Vpb:API=${API_VERSION}
