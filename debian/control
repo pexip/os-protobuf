@@ -5,7 +5,7 @@ Maintainer: Pexip AS <packaging@pexip.com>
 XSBC-Pexip-Original-Maintainer: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Build-Depends:
 # Debian build system
- , debhelper (>= 11)
+ debhelper (>= 11)
 # C/C++
  , zlib1g-dev
  , libgmock-dev
@@ -29,7 +29,7 @@ Build-Depends:
  , gem2deb
 Build-Depends-Indep:
 # Java
- , ant
+ ant
  , default-jdk
  , maven-repo-helper
 Standards-Version: 4.2.1
