@@ -1,3 +1,9 @@
+protobuf (3.6.1.3-2pexip3) pexip; urgency=medium
+
+  * Fix B-D/B-D-I syntax to avoid breaking on newer (more correct) parsers.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Tue, 20 Apr 2021 11:50:44 +0100
+
 protobuf (3.6.1.3-2pexip2) pexip; urgency=medium
 
   * Rebuild in buster environment
