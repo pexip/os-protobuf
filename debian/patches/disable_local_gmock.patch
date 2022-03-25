@@ -23,7 +23,7 @@ Last-Update: 2018-05-29
  # be careful because clean-local is also invoked during "make distclean", but
 --- a/src/Makefile.am
 +++ b/src/Makefile.am
-@@ -718,10 +718,8 @@ GOOGLEMOCK_SRC_DIR=$(srcdir)/../third_pa
+@@ -715,10 +715,8 @@ GOOGLEMOCK_SRC_DIR=$(srcdir)/../third_pa
  check_PROGRAMS = protoc protobuf-test protobuf-lazy-descriptor-test \
                   protobuf-lite-test test_plugin protobuf-lite-arena-test \
                   no-warning-test $(GZCHECKPROGRAMS)
@@ -36,7 +36,7 @@ Last-Update: 2018-05-29
  protobuf_test_CPPFLAGS = -I$(GOOGLETEST_SRC_DIR)/include \
                           -I$(GOOGLEMOCK_SRC_DIR)/include
  # Disable optimization for tests unless the user explicitly asked for it,
-@@ -810,10 +808,7 @@ $(am_protobuf_test_OBJECTS): unittest_pr
+@@ -811,10 +809,7 @@ $(am_protobuf_test_OBJECTS): unittest_pr
  
  # Run cpp_unittest again with PROTOBUF_TEST_NO_DESCRIPTORS defined.
  protobuf_lazy_descriptor_test_LDADD = $(PTHREAD_LIBS) libprotobuf.la \
@@ -48,7 +48,7 @@ Last-Update: 2018-05-29
  protobuf_lazy_descriptor_test_CPPFLAGS = -I$(GOOGLEMOCK_SRC_DIR)/include \
                                           -I$(GOOGLETEST_SRC_DIR)/include \
                                           -DPROTOBUF_TEST_NO_DESCRIPTORS
-@@ -837,9 +832,7 @@ COMMON_LITE_TEST_SOURCES =
+@@ -838,9 +833,7 @@ COMMON_LITE_TEST_SOURCES =
  # full runtime and we want to make sure this test builds without full
  # runtime.
  protobuf_lite_test_LDADD = $(PTHREAD_LIBS) libprotobuf-lite.la     \
@@ -59,7 +59,7 @@ Last-Update: 2018-05-29
  protobuf_lite_test_CPPFLAGS= -I$(GOOGLEMOCK_SRC_DIR)/include \
                               -I$(GOOGLETEST_SRC_DIR)/include
  protobuf_lite_test_CXXFLAGS = $(NO_OPT_CXXFLAGS)
-@@ -853,9 +846,7 @@ $(am_protobuf_lite_test_OBJECTS): unitte
+@@ -854,9 +847,7 @@ $(am_protobuf_lite_test_OBJECTS): unitte
  # gtest when building the test internally our memory sanitizer doesn't detect
  # memory leaks (don't know why).
  protobuf_lite_arena_test_LDADD = $(PTHREAD_LIBS) libprotobuf-lite.la \
@@ -70,7 +70,7 @@ Last-Update: 2018-05-29
  protobuf_lite_arena_test_CPPFLAGS = -I$(GOOGLEMOCK_SRC_DIR)/include  \
                                      -I$(GOOGLETEST_SRC_DIR)/include
  protobuf_lite_arena_test_CXXFLAGS = $(NO_OPT_CXXFLAGS)
-@@ -867,7 +858,7 @@ $(am_protobuf_lite_arena_test_OBJECTS):
+@@ -868,7 +859,7 @@ $(am_protobuf_lite_arena_test_OBJECTS):
  
  # Test plugin binary.
  test_plugin_LDADD = $(PTHREAD_LIBS) libprotobuf.la libprotoc.la \

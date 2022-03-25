@@ -5,9 +5,9 @@
 
 set -e
 
-cp -a examples $ADTTMP
+cp -a examples $AUTOPKGTEST_TMP
 
-cd $ADTTMP/examples
+cd $AUTOPKGTEST_TMP/examples
 
 export CLASSPATH=/usr/share/java/protobuf.jar
 
