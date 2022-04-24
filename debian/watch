@@ -1,4 +1,5 @@
 version=4
-opts=uversionmangle=s/-?(beta)-?/~$1/;s/-?(alpha)-?/~$1/;s/-?(rc)-?/~rc/ \
-  https://github.com/google/protobuf/releases \
-.*[^n]/(?:|v|version-|version|release-|r|REL_|rel-|protobuf(?:_|-))(3[^\s/]*)@ARCHIVE_EXT@
+opts=uversionmangle=s/(\d)[_\.\-\+]?((rc|pre|dev|beta|alpha|b|a)[\-\.]?\d*)$/$1~$2/i,\
+dversionmangle=s/\+(debian|dfsg|ds|deb)(\.?\d+)?$//i \
+https://github.com/protocolbuffers/protobuf/tags \
+(?:|.*/)v?(\d\S*)@ARCHIVE_EXT@

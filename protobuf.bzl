@@ -76,18 +76,30 @@ def _RelativeOutputPath(path, include, dest = ""):
 def _proto_gen_impl(ctx):
     """General implementation for generating protos"""
     srcs = ctx.files.srcs
-    deps = []
-    deps += ctx.files.srcs
+    deps = depset(direct=ctx.files.srcs)
     source_dir = _SourceDir(ctx)
     gen_dir = _GenDir(ctx).rstrip("/")
     if source_dir:
-        import_flags = ["-I" + source_dir, "-I" + gen_dir]
+        has_sources = any([src.is_source for src in srcs])
+        has_generated = any([not src.is_source for src in srcs])
+        import_flags = []
+        if has_sources:
+            import_flags += ["-I" + source_dir]
+        if has_generated:
+            import_flags += ["-I" + gen_dir]
+        import_flags = depset(direct=import_flags)
     else:
-        import_flags = ["-I."]
+        import_flags = depset(direct=["-I."])
 
     for dep in ctx.attr.deps:
-        import_flags += dep.proto.import_flags
-        deps += dep.proto.deps
+        if type(dep.proto.import_flags) == "list":
+            import_flags = depset(transitive=[import_flags], direct=dep.proto.import_flags)
+        else:
+            import_flags = depset(transitive=[import_flags, dep.proto.import_flags])
+        if type(dep.proto.deps) == "list":
+            deps = depset(transitive=[deps], direct=dep.proto.deps)
+        else:
+            deps = depset(transitive=[deps, dep.proto.deps])
 
     if not ctx.attr.gen_cc and not ctx.attr.gen_py and not ctx.executable.plugin:
         return struct(
@@ -104,7 +116,7 @@ def _proto_gen_impl(ctx):
         in_gen_dir = src.root.path == gen_dir
         if in_gen_dir:
             import_flags_real = []
-            for f in depset(import_flags).to_list():
+            for f in import_flags.to_list():
                 path = f.replace("-I", "")
                 import_flags_real.append("-I$(realpath -s %s)" % path)
 
@@ -119,7 +131,7 @@ def _proto_gen_impl(ctx):
             outs.extend(_PyOuts([src.basename], use_grpc_plugin = use_grpc_plugin))
 
         outs = [ctx.actions.declare_file(out, sibling = src) for out in outs]
-        inputs = [src] + deps
+        inputs = [src] + deps.to_list()
         tools = [ctx.executable.protoc]
         if ctx.executable.plugin:
             plugin = ctx.executable.plugin
@@ -142,7 +154,7 @@ def _proto_gen_impl(ctx):
                 inputs = inputs,
                 tools = tools,
                 outputs = outs,
-                arguments = args + import_flags + [src.path],
+                arguments = args + import_flags.to_list() + [src.path],
                 executable = ctx.executable.protoc,
                 mnemonic = "ProtoCompile",
                 use_default_shell_env = True,
@@ -185,13 +197,13 @@ proto_gen = rule(
         "deps": attr.label_list(providers = ["proto"]),
         "includes": attr.string_list(),
         "protoc": attr.label(
-            cfg = "host",
+            cfg = "exec",
             executable = True,
             allow_single_file = True,
             mandatory = True,
         ),
         "plugin": attr.label(
-            cfg = "host",
+            cfg = "exec",
             allow_files = True,
             executable = True,
         ),
@@ -323,7 +335,12 @@ def _internal_gen_well_known_protos_java_impl(ctx):
     deps = [d[ProtoInfo] for d in ctx.attr.deps]
 
     srcjar = ctx.actions.declare_file("{}.srcjar".format(ctx.attr.name))
-    args.add("--java_out", srcjar)
+    if ctx.attr.javalite:
+        java_out = "lite:%s" % srcjar.path
+    else:
+        java_out = srcjar
+
+    args.add("--java_out", java_out)
 
     descriptors = depset(
         transitive = [dep.transitive_descriptor_sets for dep in deps],
@@ -347,6 +364,7 @@ def _internal_gen_well_known_protos_java_impl(ctx):
         inputs = descriptors,
         outputs = [srcjar],
         arguments = [args],
+        use_default_shell_env = True,
     )
 
     return [
@@ -362,13 +380,80 @@ internal_gen_well_known_protos_java = rule(
             mandatory = True,
             providers = [ProtoInfo],
         ),
+        "javalite": attr.bool(
+            default = False,
+        ),
         "_protoc": attr.label(
             executable = True,
-            cfg = "host",
+            cfg = "exec",
             default = "@com_google_protobuf//:protoc",
         ),
     },
 )
+
+def _internal_gen_kt_protos(ctx):
+    args = ctx.actions.args()
+
+    deps = [d[ProtoInfo] for d in ctx.attr.deps]
+
+    srcjar = ctx.actions.declare_file("{}.srcjar".format(ctx.attr.name))
+    if ctx.attr.lite:
+        out = "lite:%s" % srcjar.path
+    else:
+        out = srcjar
+
+    args.add("--kotlin_out", out)
+
+    descriptors = depset(
+        transitive = [dep.transitive_descriptor_sets for dep in deps],
+    )
+    args.add_joined(
+        "--descriptor_set_in",
+        descriptors,
+        join_with = ctx.configuration.host_path_separator,
+    )
+
+    for dep in deps:
+        if "." == dep.proto_source_root:
+            args.add_all([src.path for src in dep.direct_sources])
+        else:
+            source_root = dep.proto_source_root
+            offset = len(source_root) + 1  # + '/'.
+            args.add_all([src.path[offset:] for src in dep.direct_sources])
+
+    ctx.actions.run(
+        executable = ctx.executable._protoc,
+        inputs = descriptors,
+        outputs = [srcjar],
+        arguments = [args],
+        use_default_shell_env = True,
+    )
+
+    return [
+        DefaultInfo(
+            files = depset([srcjar]),
+        ),
+    ]
+
+internal_gen_kt_protos = rule(
+    implementation = _internal_gen_kt_protos,
+    attrs = {
+        "deps": attr.label_list(
+            mandatory = True,
+            providers = [ProtoInfo],
+        ),
+        "lite": attr.bool(
+            default = False,
+        ),
+        "_protoc": attr.label(
+            executable = True,
+            cfg = "exec",
+            default = "//:protoc",
+        ),
+    },
+)
+
+
 
 def internal_copied_filegroup(name, srcs, strip_prefix, dest, **kwargs):
     """Macro to copy files to a different directory and then create a filegroup.
@@ -432,7 +517,7 @@ def py_proto_library(
       protoc: the label of the protocol compiler to generate the sources.
       use_grpc_plugin: a flag to indicate whether to call the Python C++ plugin
           when processing the proto files.
-      **kargs: other keyword arguments that are passed to cc_library.
+      **kargs: other keyword arguments that are passed to py_library.
 
     """
     outs = _PyOuts(srcs, use_grpc_plugin)

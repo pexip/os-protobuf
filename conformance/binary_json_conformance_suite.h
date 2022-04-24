@@ -42,7 +42,7 @@ class BinaryAndJsonConformanceSuite : public ConformanceTestSuite {
   BinaryAndJsonConformanceSuite() {}
 
  private:
-  void RunSuiteImpl();
+  void RunSuiteImpl() override;
   void RunJsonTests();
   void RunJsonTestsForFieldNameConvention();
   void RunJsonTestsForNonRepeatedTypes();
@@ -95,7 +95,8 @@ class BinaryAndJsonConformanceSuite : public ConformanceTestSuite {
   void RunValidJsonTestWithValidator(const std::string& test_name,
                                      ConformanceLevel level,
                                      const std::string& input_json,
-                                     const Validator& validator);
+                                     const Validator& validator,
+                                     bool is_proto3);
   void ExpectParseFailureForJson(const std::string& test_name,
                                  ConformanceLevel level,
                                  const std::string& input_json);

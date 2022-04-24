@@ -2,22 +2,22 @@ Description: cut number 32 bit number parsing in Python 2 self-tests
  Any number get back as zero. :-/
 Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Forwarded: no
-Last-Update: 2019-09-12
+Last-Update: 2022-03-11
 
 ---
 
 --- a/python/google/protobuf/internal/text_format_test.py
 +++ b/python/google/protobuf/internal/text_format_test.py
-@@ -41,6 +41,8 @@ import textwrap
+@@ -39,6 +39,8 @@ import textwrap
  
- import six
+ import unittest
  
 +import platform
 +
- # pylint: disable=g-import-not-at-top
- try:
-   import unittest2 as unittest  # PY26
-@@ -1024,29 +1026,52 @@ class OnlyWorksWithProto2RightNowTests(T
+ from google.protobuf import any_pb2
+ from google.protobuf import any_test_pb2
+ from google.protobuf import map_unittest_pb2
+@@ -1044,29 +1046,52 @@ class OnlyWorksWithProto2RightNowTests(T
      all_data = message.SerializeToString()
      empty_message = unittest_pb2.TestEmptyMessage()
      empty_message.ParseFromString(all_data)

@@ -6,7 +6,7 @@ Comment:
  on Mon, 07 Jul 2008 17:48:21 +0200.
 
 Files: *
-Copyright: 2008-2018 Google Inc.
+Copyright: 2008-2021 Google Inc.
 License: BSD-3-Clause~Google
 
 Files: m4/ax_pthread.m4
@@ -35,7 +35,7 @@ Copyright: 2008 Google Inc.
 License: Apache-2.0
 
 Files: conformance/third_party/jsoncpp/*
-Copyright: 2007-2010 Baptiste Lepilleur
+Copyright: 2007-2011 Baptiste Lepilleur
 License: Public-Domain or Expat
 
 Files: debian/*
@@ -47,6 +47,38 @@ Copyright:
     2008,2009,2010 Iustin Pop <iusty@k1024.org>
     2016-     Laszlo Boszormenyi (GCS) <gcs@debian.org>
 License: GPL-3
+
+Files: debian/patches/*
+Copyright:
+    2016      Sebastiaan Couwenberg <sebastic@xs4all.nl>
+    2019      Bas Couwenberg <sebastic@debian.org>
+    2019      Laurence Parry <greenreaper@gmail.com>
+    2020-     Olek Wojnar <olek@debian.org>
+    2016-     Laszlo Boszormenyi (GCS) <gcs@debian.org>
+License: BSD-3-Clause
+ Redistribution and use in source and binary forms, with or without
+ modification, are permitted provided that the following conditions
+ are met:
+ 1. Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+ 3. Neither the name of the project nor the names of its contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
+ .
+ THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ SUCH DAMAGE.
 
 License: Public-Domain
  The author explicitly disclaims copyright in all jurisdictions which

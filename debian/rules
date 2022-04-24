@@ -5,9 +5,7 @@
 #export DH_VERBOSE=1
 
 include /usr/share/dpkg/architecture.mk
-ifeq ($(origin CXX),default)
-CXX := $(DEB_HOST_GNU_TYPE)-g++
-endif
+include /usr/share/dpkg/buildtools.mk
 
 export DH_RUBY = --gem-install
 export DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR = debian/ruby-google-protobuf
@@ -17,17 +15,17 @@ ifneq (,$(findstring $(DEB_BUILD_ARCH), armel m68k mips mipsel powerpc powerpcsp
 export DEB_LDFLAGS_MAINT_APPEND  = -latomic
 endif
 
-SONAME=23
+SONAME=31
 API_VERSION=$(SONAME)-0
 
 %:
-	dh $@ --with autoreconf,elpa,python3
+	dh $@ --with autoreconf,elpa
 
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 override_dh_auto_configure:
 	# build for the native (i.e. build) architecture, as we need
 	# the protoc compiler for the native arch.
-	dh_auto_configure -- --host=$(DEB_BUILD_GNU_TYPE)
+	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure
 
 PYTHON_CROSS_VARS += PROTOC=$(CURDIR)/debian/run_protoc
 PYTHON_CROSS_VARS += PYTHONPATH=/usr/lib/python$$pv/plat-$(DEB_HOST_MULTIARCH)
@@ -57,14 +55,18 @@ endif
 	# Generate the manpage
 	xmlto man debian/protoc.xml
 
+ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 build
 	cp -rv python python3
 	set -e; cd python3 && for pv in $(shell py3versions -vr); do \
 		$(PYTHON_CROSS_VARS) python$$pv setup.py build --cpp_implementation; \
 	done
+endif
 
+ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
 	# Ruby build
 	cd ruby && rake package genproto
+endif
 
 override_dh_auto_build-indep:
 	dh_auto_build --indep
@@ -74,7 +76,9 @@ override_dh_auto_build-indep:
 
 override_dh_clean:
 	$(RM) -rv gmock
+ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
 	cd ruby && rake clobber
+endif
 	dh_clean
 	$(RM) config.h config.log config.status
 	$(RM) *.pc
@@ -89,12 +93,13 @@ override_dh_clean:
 		ruby/tests/test_import_proto2_pb.rb \
 		ruby/tests/test_ruby_package_pb.rb \
 		ruby/tests/test_ruby_package_proto2_pb.rb
+	$(RM) -r ruby/ext/google/protobuf_c/third_party/utf8_range/
 	find $(CURDIR) -name Makefile -delete
 
 override_dh_auto_test-arch:
 	dh_auto_test --arch
 
-ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS))$(filter nopython,$(DEB_BUILD_PROFILES)))
     # Python3 test
 	set -e; \
 	export LD_LIBRARY_PATH=$(CURDIR)/src/.libs; \
@@ -122,6 +127,7 @@ override_dh_auto_clean-indep:
 override_dh_auto_install-arch:
 	dh_auto_install --arch
 
+ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 install
 	set -e; \
 	cd python3 && for pv in $(shell py3versions -vr); do \
@@ -130,18 +136,19 @@ override_dh_auto_install-arch:
 			--root=$(CURDIR)/debian/python3-protobuf; \
 	done
 	find $(CURDIR)/debian/python3-protobuf -name 'protobuf-*-nspkg.pth' -delete
+endif
 
+ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
 	# Ruby install
 	 sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
 		 >$(CURDIR)/google-protobuf.gemspec
 	dh_auto_install -O--buildsystem=ruby -O--package=ruby-google-protobuf --destdir=$(CURDIR)/debian/ruby-google-protobuf
 	find $(CURDIR)/debian/ruby-google-protobuf/usr/lib/ \
 		-name well_known_types.rb -exec chmod a+x {} \;
+endif
 
 override_dh_auto_install-indep:
 	dh_auto_install --indep
-	find $(CURDIR)/debian/tmp/usr/lib/ \
-		-name '*.la' -delete
 
 	# Java install
 	mh_install
@@ -171,3 +178,6 @@ override_dh_installdocs-indep:
 
 override_dh_gencontrol:
 	dh_gencontrol -- -Vpb:API=${API_VERSION}
+
+override_dh_dwz:
+	echo GCC bug
