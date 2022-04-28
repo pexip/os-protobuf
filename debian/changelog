@@ -1,3 +1,9 @@
+protobuf (3.12.3-2~bpo10+1pexip2) pexip; urgency=medium
+
+  * Don't build ruby/java libraries
+
+ -- Huw Jones <huw@pexip.com>  Thu, 28 Apr 2022 08:43:36 +0100
+
 protobuf (3.12.3-2~bpo10+1pexip1) pexip; urgency=medium
 
   * New upstream release

@@ -63,17 +63,17 @@ endif
 	done
 
 	# Ruby build
-	cd ruby && rake package genproto
+# 	cd ruby && rake package genproto
 
 override_dh_auto_build-indep:
 	dh_auto_build --indep
 
 	# Java build
-	ant -f debian/java-build.xml jar jar-util
+# 	ant -f debian/java-build.xml jar jar-util
 
 override_dh_clean:
 	$(RM) -rv gmock
-	cd ruby && rake clobber
+	cd ruby && rake clobber || true
 	dh_clean
 	$(RM) config.h config.log config.status
 	$(RM) *.pc
@@ -131,11 +131,11 @@ override_dh_auto_install-arch:
 	find $(CURDIR)/debian/python3-protobuf -name 'protobuf-*-nspkg.pth' -delete
 
 	# Ruby install
-	 sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
-		 >$(CURDIR)/google-protobuf.gemspec
-	dh_auto_install -O--buildsystem=ruby -O--package=ruby-google-protobuf --destdir=$(CURDIR)/debian/ruby-google-protobuf
-	find $(CURDIR)/debian/ruby-google-protobuf/usr/lib/ \
-		-name well_known_types.rb -exec chmod a+x {} \;
+# 	 sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+# 		 >$(CURDIR)/google-protobuf.gemspec
+# 	dh_auto_install -O--buildsystem=ruby -O--package=ruby-google-protobuf --destdir=$(CURDIR)/debian/ruby-google-protobuf
+# 	find $(CURDIR)/debian/ruby-google-protobuf/usr/lib/ \
+# 		-name well_known_types.rb -exec chmod a+x {} \;
 
 override_dh_auto_install-indep:
 	dh_auto_install --indep
@@ -143,7 +143,7 @@ override_dh_auto_install-indep:
 		-name '*.la' -delete
 
 	# Java install
-	mh_install
+# 	mh_install
 
 override_dh_install-arch:
 	dh_install --arch
