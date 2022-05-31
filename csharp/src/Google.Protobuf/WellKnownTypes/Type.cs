@@ -94,11 +94,7 @@ namespace Google.Protobuf.WellKnownTypes {
   /// <summary>
   /// A protocol buffer message type.
   /// </summary>
-  public sealed partial class Type : pb::IMessage<Type>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
+  public sealed partial class Type : pb::IMessage<Type> {
     private static readonly pb::MessageParser<Type> _parser = new pb::MessageParser<Type>(() => new Type());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -328,9 +324,6 @@ namespace Google.Protobuf.WellKnownTypes {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
       uint tag;
       while ((tag = input.ReadTag()) != 0) {
         switch(tag) {
@@ -366,60 +359,14 @@ namespace Google.Protobuf.WellKnownTypes {
           }
         }
       }
-    #endif
     }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-        switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            Name = input.ReadString();
-            break;
-          }
-          case 18: {
-            fields_.AddEntriesFrom(ref input, _repeated_fields_codec);
-            break;
-          }
-          case 26: {
-            oneofs_.AddEntriesFrom(ref input, _repeated_oneofs_codec);
-            break;
-          }
-          case 34: {
-            options_.AddEntriesFrom(ref input, _repeated_options_codec);
-            break;
-          }
-          case 42: {
-            if (sourceContext_ == null) {
-              SourceContext = new global::Google.Protobuf.WellKnownTypes.SourceContext();
-            }
-            input.ReadMessage(SourceContext);
-            break;
-          }
-          case 48: {
-            Syntax = (global::Google.Protobuf.WellKnownTypes.Syntax) input.ReadEnum();
-            break;
-          }
-        }
-      }
-    }
-    #endif
 
   }
 
   /// <summary>
   /// A single field of a message type.
   /// </summary>
-  public sealed partial class Field : pb::IMessage<Field>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
+  public sealed partial class Field : pb::IMessage<Field> {
     private static readonly pb::MessageParser<Field> _parser = new pb::MessageParser<Field>(() => new Field());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -772,9 +719,6 @@ namespace Google.Protobuf.WellKnownTypes {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
       uint tag;
       while ((tag = input.ReadTag()) != 0) {
         switch(tag) {
@@ -823,62 +767,7 @@ namespace Google.Protobuf.WellKnownTypes {
           }
         }
       }
-    #endif
     }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-        switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 8: {
-            Kind = (global::Google.Protobuf.WellKnownTypes.Field.Types.Kind) input.ReadEnum();
-            break;
-          }
-          case 16: {
-            Cardinality = (global::Google.Protobuf.WellKnownTypes.Field.Types.Cardinality) input.ReadEnum();
-            break;
-          }
-          case 24: {
-            Number = input.ReadInt32();
-            break;
-          }
-          case 34: {
-            Name = input.ReadString();
-            break;
-          }
-          case 50: {
-            TypeUrl = input.ReadString();
-            break;
-          }
-          case 56: {
-            OneofIndex = input.ReadInt32();
-            break;
-          }
-          case 64: {
-            Packed = input.ReadBool();
-            break;
-          }
-          case 74: {
-            options_.AddEntriesFrom(ref input, _repeated_options_codec);
-            break;
-          }
-          case 82: {
-            JsonName = input.ReadString();
-            break;
-          }
-          case 90: {
-            DefaultValue = input.ReadString();
-            break;
-          }
-        }
-      }
-    }
-    #endif
 
     #region Nested types
     /// <summary>Container for nested types declared in the Field message type.</summary>
@@ -996,11 +885,7 @@ namespace Google.Protobuf.WellKnownTypes {
   /// <summary>
   /// Enum type definition.
   /// </summary>
-  public sealed partial class Enum : pb::IMessage<Enum>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
+  public sealed partial class Enum : pb::IMessage<Enum> {
     private static readonly pb::MessageParser<Enum> _parser = new pb::MessageParser<Enum>(() => new Enum());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1211,9 +1096,6 @@ namespace Google.Protobuf.WellKnownTypes {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
       uint tag;
       while ((tag = input.ReadTag()) != 0) {
         switch(tag) {
@@ -1245,56 +1127,14 @@ namespace Google.Protobuf.WellKnownTypes {
           }
         }
       }
-    #endif
     }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-        switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            Name = input.ReadString();
-            break;
-          }
-          case 18: {
-            enumvalue_.AddEntriesFrom(ref input, _repeated_enumvalue_codec);
-            break;
-          }
-          case 26: {
-            options_.AddEntriesFrom(ref input, _repeated_options_codec);
-            break;
-          }
-          case 34: {
-            if (sourceContext_ == null) {
-              SourceContext = new global::Google.Protobuf.WellKnownTypes.SourceContext();
-            }
-            input.ReadMessage(SourceContext);
-            break;
-          }
-          case 40: {
-            Syntax = (global::Google.Protobuf.WellKnownTypes.Syntax) input.ReadEnum();
-            break;
-          }
-        }
-      }
-    }
-    #endif
 
   }
 
   /// <summary>
   /// Enum value definition.
   /// </summary>
-  public sealed partial class EnumValue : pb::IMessage<EnumValue>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
+  public sealed partial class EnumValue : pb::IMessage<EnumValue> {
     private static readonly pb::MessageParser<EnumValue> _parser = new pb::MessageParser<EnumValue>(() => new EnumValue());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1456,9 +1296,6 @@ namespace Google.Protobuf.WellKnownTypes {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
       uint tag;
       while ((tag = input.ReadTag()) != 0) {
         switch(tag) {
@@ -1479,34 +1316,7 @@ namespace Google.Protobuf.WellKnownTypes {
           }
         }
       }
-    #endif
     }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-        switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            Name = input.ReadString();
-            break;
-          }
-          case 16: {
-            Number = input.ReadInt32();
-            break;
-          }
-          case 26: {
-            options_.AddEntriesFrom(ref input, _repeated_options_codec);
-            break;
-          }
-        }
-      }
-    }
-    #endif
 
   }
 
@@ -1514,11 +1324,7 @@ namespace Google.Protobuf.WellKnownTypes {
   /// A protocol buffer option, which can be attached to a message, field,
   /// enumeration, etc.
   /// </summary>
-  public sealed partial class Option : pb::IMessage<Option>
-  #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      , pb::IBufferMessage
-  #endif
-  {
+  public sealed partial class Option : pb::IMessage<Option> {
     private static readonly pb::MessageParser<Option> _parser = new pb::MessageParser<Option>(() => new Option());
     private pb::UnknownFieldSet _unknownFields;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1670,9 +1476,6 @@ namespace Google.Protobuf.WellKnownTypes {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public void MergeFrom(pb::CodedInputStream input) {
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-      input.ReadRawMessage(this);
-    #else
       uint tag;
       while ((tag = input.ReadTag()) != 0) {
         switch(tag) {
@@ -1692,33 +1495,7 @@ namespace Google.Protobuf.WellKnownTypes {
           }
         }
       }
-    #endif
     }
-
-    #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
-    [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
-    void pb::IBufferMessage.InternalMergeFrom(ref pb::ParseContext input) {
-      uint tag;
-      while ((tag = input.ReadTag()) != 0) {
-        switch(tag) {
-          default:
-            _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
-            break;
-          case 10: {
-            Name = input.ReadString();
-            break;
-          }
-          case 18: {
-            if (value_ == null) {
-              Value = new global::Google.Protobuf.WellKnownTypes.Any();
-            }
-            input.ReadMessage(Value);
-            break;
-          }
-        }
-      }
-    }
-    #endif
 
   }
 

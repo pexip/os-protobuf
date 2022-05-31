@@ -56,7 +56,6 @@ class MapFieldGenerator : public FieldGeneratorBase {
   virtual void GenerateMembers(io::Printer* printer);
   virtual void GenerateMergingCode(io::Printer* printer);
   virtual void GenerateParsingCode(io::Printer* printer);
-  virtual void GenerateParsingCode(io::Printer* printer, bool use_parse_context);
   virtual void GenerateSerializationCode(io::Printer* printer);
   virtual void GenerateSerializedSizeCode(io::Printer* printer);
 
