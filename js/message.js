@@ -417,7 +417,7 @@ jspb.Message.EMPTY_LIST_SENTINEL_ = goog.DEBUG && Object.freeze ?
  */
 jspb.Message.isArray_ = function(o) {
   return jspb.Message.ASSUME_LOCAL_ARRAYS ? o instanceof Array :
-                                            Array.isArray(o);
+                                            goog.isArray(o);
 };
 
 /**
@@ -1433,7 +1433,7 @@ jspb.Message.prototype.syncMapFields_ = function() {
   if (this.wrappers_) {
     for (var fieldNumber in this.wrappers_) {
       var val = this.wrappers_[fieldNumber];
-      if (Array.isArray(val)) {
+      if (goog.isArray(val)) {
         for (var i = 0; i < val.length; i++) {
           if (val[i]) {
             val[i].toArray();
@@ -1823,7 +1823,7 @@ jspb.Message.copyInto = function(fromMessage, toMessage) {
  */
 jspb.Message.clone_ = function(obj) {
   var o;
-  if (Array.isArray(obj)) {
+  if (goog.isArray(obj)) {
     // Allocate array of correct size.
     var clonedArray = new Array(obj.length);
     // Use array iteration where possible because it is faster than for-in.

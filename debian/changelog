@@ -1,16 +1,20 @@
+protobuf (3.12.4-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Let libprotobuf-dev provide API version.
+  * Add upstream metadata.
+  * Update watch file.
+  * Update packaging bits.
+  * Update Standards-Version to 4.5.1 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 16 Jan 2021 23:12:54 +0100
+
 protobuf (3.12.3-2~bpo10+1pexip1) pexip; urgency=medium
 
   * New upstream release
   * Refresh debian/patches/unknown_enums.patch
 
  -- John-Mark Bell <jmb@pexip.com>  Thu, 08 Oct 2020 16:01:06 +0100
-
-protobuf (3.12.3-2~bpo10+1) buster-backports; urgency=medium
-
-  * Rebuild for buster-backports.
-  * Lower debhelper-compat to 11 for dwz compatibility
-
- -- Pirate Praveen <praveen@debian.org>  Thu, 30 Jul 2020 09:17:15 +0000
 
 protobuf (3.12.3-2) unstable; urgency=medium
 
