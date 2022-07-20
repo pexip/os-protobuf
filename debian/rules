@@ -25,6 +25,10 @@ API_VERSION=$(SONAME)-0
 
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 override_dh_auto_configure:
+	# Prepare a clean copy of the source
+	mkdir protobuf-source/
+	cp -a src/google protobuf-source/
+
 	# build for the native (i.e. build) architecture, as we need
 	# the protoc compiler for the native arch.
 	dh_auto_configure -- --host=$(DEB_BUILD_GNU_TYPE)
@@ -34,6 +38,13 @@ PYTHON_CROSS_VARS += PYTHONPATH=/usr/lib/python$$pv/plat-$(DEB_HOST_MULTIARCH)
 PYTHON_CROSS_VARS += _PYTHON_HOST_PLATFORM=$(DEB_HOST_ARCH_OS)-$(DEB_HOST_GNU_CPU)
 PYTHON_CROSS_VARS += CC=$(CXX)
 PYTHON_CROSS_VARS += CXX=$(CXX)
+else
+override_dh_auto_configure:
+	# Prepare a clean copy of the source
+	mkdir protobuf-source/
+	cp -a src/google protobuf-source/
+
+	dh_auto_configure
 endif
 
 override_dh_auto_build-arch:
@@ -90,6 +101,7 @@ override_dh_clean:
 		ruby/tests/test_ruby_package_pb.rb \
 		ruby/tests/test_ruby_package_proto2_pb.rb
 	find $(CURDIR) -name Makefile -delete
+	$(RM) -fr protobuf-source/
 
 override_dh_auto_test-arch:
 	dh_auto_test --arch
