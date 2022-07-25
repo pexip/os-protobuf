@@ -46,6 +46,7 @@ import com.google.protobuf.Message;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
 
 /**
  * Utility helper functions to work with {@link com.google.protobuf.FieldMask}.
@@ -230,10 +231,8 @@ public final class FieldMaskUtil {
     return isValid(descriptor, path);
   }
 
-  /**
-   * Checks whether paths in a given fields mask are valid.
-   */
-  public static boolean isValid(Descriptor descriptor, String path) {
+  /** Checks whether paths in a given fields mask are valid. */
+  public static boolean isValid(@Nullable Descriptor descriptor, String path) {
     String[] parts = path.split(FIELD_SEPARATOR_REGEX);
     if (parts.length == 0) {
       return false;
@@ -272,6 +271,22 @@ public final class FieldMaskUtil {
     FieldMaskTree maskTree = new FieldMaskTree(firstMask).mergeFromFieldMask(secondMask);
     for (FieldMask mask : otherMasks) {
       maskTree.mergeFromFieldMask(mask);
+    }
+    return maskTree.toFieldMask();
+  }
+
+  /**
+   * Subtracts {@code secondMask} and {@code otherMasks} from {@code firstMask}.
+   *
+   * <p>This method disregards proto structure. That is, if {@code firstMask} is "foo" and {@code
+   * secondMask} is "foo.bar", the response will always be "foo" without considering the internal
+   * proto structure of message "foo".
+   */
+  public static FieldMask subtract(
+      FieldMask firstMask, FieldMask secondMask, FieldMask... otherMasks) {
+    FieldMaskTree maskTree = new FieldMaskTree(firstMask).removeFromFieldMask(secondMask);
+    for (FieldMask mask : otherMasks) {
+      maskTree.removeFromFieldMask(mask);
     }
     return maskTree.toFieldMask();
   }
@@ -381,5 +396,15 @@ public final class FieldMaskUtil {
    */
   public static void merge(FieldMask mask, Message source, Message.Builder destination) {
     merge(mask, source, destination, new MergeOptions());
+  }
+
+  /**
+   * Returns the result of keeping only the masked fields of the given proto.
+   */
+  @SuppressWarnings("unchecked")
+  public static <P extends Message> P trim(FieldMask mask, P source) {
+   Message.Builder destination = source.newBuilderForType();
+    merge(mask, source, destination);
+    return (P) destination.build();
   }
 }

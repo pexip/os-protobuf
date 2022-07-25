@@ -2,7 +2,7 @@ Description: don't compile third_party source
  .
 Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Forwarded: not-needed
-Last-Update: 2019-08-06
+Last-Update: 2022-03-11
 
 ---
 
@@ -19,7 +19,7 @@ Last-Update: 2019-08-06
  # because then "make check" would also build and run all of gmock's own tests,
 --- protobuf-3.9.1.orig/configure.ac
 +++ protobuf-3.9.1/configure.ac
-@@ -228,7 +228,6 @@ AM_CONDITIONAL([OBJC_CONFORMANCE_TEST],
+@@ -241,7 +241,6 @@ AM_CONDITIONAL([OBJC_CONFORMANCE_TEST],
  #   too.
  export CFLAGS
  export CXXFLAGS

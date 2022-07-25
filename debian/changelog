@@ -1,3 +1,135 @@
+protobuf (3.20.1-1pexip1) pexip-bullseye; urgency=medium
+
+  * New upstream release for Pexip bullseye build.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Mon, 25 Jul 2022 09:20:52 +0100
+
+protobuf (3.20.1-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 24 Apr 2022 11:37:50 +0200
+
+protobuf (3.20.1~rc1-1) experimental; urgency=medium
+
+  * New upstream release candidate version.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 09 Apr 2022 10:45:32 +0200
+
+protobuf (3.20.0-1) experimental; urgency=medium
+
+  * New major upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 26 Mar 2022 16:51:05 +0100
+
+protobuf (3.20.0~rc2-1) experimental; urgency=medium
+
+  * New major upstream release candidate version.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 19 Mar 2022 06:45:32 +0100
+
+protobuf (3.20.0~rc1-1) experimental; urgency=medium
+
+  * New major upstream release candidate version.
+  * Update patches.
+  * Library transition from libproto*30 to libproto*31 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Fri, 11 Mar 2022 01:28:07 +0100
+
+protobuf (3.19.4-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 30 Jan 2022 08:21:03 +0100
+
+protobuf (3.19.3-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 16 Jan 2022 13:59:22 +0100
+
+protobuf (3.19.1-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Fri, 05 Nov 2021 06:46:47 +0100
+
+protobuf (3.19.0-1) experimental; urgency=medium
+
+  * New major upstream release.
+  * Clarify license of the Debian patches (closes: #996882).
+  * Update patches.
+  * Library transition from libproto*29 to libproto*30 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Wed, 20 Oct 2021 23:31:59 +0200
+
+protobuf (3.18.1-1) experimental; urgency=medium
+
+  * New upstream release.
+  * Update watch file.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 10 Oct 2021 07:55:53 +0200
+
+protobuf (3.18.0-1) experimental; urgency=medium
+
+  * New major upstream release.
+  * Update Standards-Version to 4.6.0 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Wed, 22 Sep 2021 20:36:35 +0200
+
+protobuf (3.18.0~rc2-1) experimental; urgency=medium
+
+  * New major upstream release candidate version.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Thu, 02 Sep 2021 17:24:30 +0200
+
+protobuf (3.18.0~rc1-1) experimental; urgency=medium
+
+  * New major upstream release candidate version.
+  * Update patches.
+  * Library transition from libproto*28 to libproto*29 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Fri, 27 Aug 2021 18:47:30 +0200
+
+protobuf (3.17.3-2) experimental; urgency=medium
+
+  [ Pirate Praveen <praveen@debian.org> ]
+  * Include ruby/lib in ruby-google-protobuf binary (closes: #992008).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 10 Aug 2021 09:16:17 +0200
+
+protobuf (3.17.3-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Wed, 23 Jun 2021 17:36:44 +0200
+
+protobuf (3.17.2-1) experimental; urgency=medium
+
+  * New major upstream release (closes: #989061).
+  * Update patches.
+  * Update packaging bits.
+  * Library transition from libproto*25 to libproto*28 .
+  * Update debhelper level to 13 .
+  * Update Standards-Version to 4.5.1 .
+
+  [ Helmut Grohne <helmut@subdivi.de> ]
+  * Support build profiles nocheck, nopython and noruby (closes: #981083).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Thu, 03 Jun 2021 18:17:40 +0200
+
+protobuf (3.14.0-1) experimental; urgency=medium
+
+  * New major upstream release.
+  * Update patches.
+  * Let libprotobuf-dev provide API version.
+  * Library transition from libproto*23 to libproto*25 .
+
+  [ Dominik George <natureshadow@debian.org> ]
+  * Build PHP package (closes: #927721).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 15 Dec 2020 07:15:10 +0100
+
 protobuf (3.12.4-1pexip4) pexip-bullseye; urgency=medium
 
   * Rebuild for override changes
@@ -21,17 +153,6 @@ protobuf (3.12.4-1pexip1) pexip; urgency=medium
   * Initial bullseye build
 
  -- Mark Hymers <mark.hymers@pexip.com>  Thu, 02 Jun 2022 14:42:42 +0100
-
-protobuf (3.12.4-1) unstable; urgency=medium
-
-  * New upstream release.
-  * Let libprotobuf-dev provide API version.
-  * Add upstream metadata.
-  * Update watch file.
-  * Update packaging bits.
-  * Update Standards-Version to 4.5.1 .
-
- -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 16 Jan 2021 23:12:54 +0100
 
 protobuf (3.12.3-2~bpo10+1pexip1) pexip; urgency=medium
 

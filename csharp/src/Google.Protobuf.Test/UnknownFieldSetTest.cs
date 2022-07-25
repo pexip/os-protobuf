@@ -139,6 +139,29 @@ namespace Google.Protobuf
         }
 
         [Test]
+        public void TestClone_LengthDelimited()
+        {
+            var unknownVarintField = new UnknownField();
+            unknownVarintField.AddVarint(99);
+
+            var unknownLengthDelimitedField1 = new UnknownField();
+            unknownLengthDelimitedField1.AddLengthDelimited(ByteString.CopyFromUtf8("some data"));
+
+            var unknownLengthDelimitedField2 = new UnknownField();
+            unknownLengthDelimitedField2.AddLengthDelimited(ByteString.CopyFromUtf8("some more data"));
+
+            var destUnknownFieldSet = new UnknownFieldSet();
+            destUnknownFieldSet.AddOrReplaceField(997, unknownVarintField);
+            destUnknownFieldSet.AddOrReplaceField(999, unknownLengthDelimitedField1);
+            destUnknownFieldSet.AddOrReplaceField(999, unknownLengthDelimitedField2);
+
+            var clone = UnknownFieldSet.Clone(destUnknownFieldSet);
+
+            Assert.IsTrue(clone.HasField(997));
+            Assert.IsTrue(clone.HasField(999));
+        }
+
+        [Test]
         [TestCaseSource(typeof(Data), "Messages")]
         public void TestDiscardUnknownFields(IMessage message)
         {
@@ -161,10 +184,10 @@ namespace Google.Protobuf
             MessageParser discardingParser2 = retainingParser2.WithDiscardUnknownFields(true);
 
             // Test parse from byte[]
-            assertFull(retainingParser1.ParseFrom(data));
-            assertFull(retainingParser2.ParseFrom(data));
-            assertEmpty(discardingParser1.ParseFrom(data));
-            assertEmpty(discardingParser2.ParseFrom(data));
+            MessageParsingHelpers.AssertReadingMessage(retainingParser1, data, m => assertFull(m));
+            MessageParsingHelpers.AssertReadingMessage(retainingParser2, data, m => assertFull(m));
+            MessageParsingHelpers.AssertReadingMessage(discardingParser1, data, m => assertEmpty(m));
+            MessageParsingHelpers.AssertReadingMessage(discardingParser2, data, m => assertEmpty(m));
 
             // Test parse from byte[] with offset
             assertFull(retainingParser1.ParseFrom(data, 0, data.Length));
