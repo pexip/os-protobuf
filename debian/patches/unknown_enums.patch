@@ -1,0 +1,42 @@
+diff --git a/python/google/protobuf/json_format.py b/python/google/protobuf/json_format.py
+index 5024ed8..34bb5a2 100644
+--- a/python/google/protobuf/json_format.py
++++ b/python/google/protobuf/json_format.py
+@@ -603,9 +603,14 @@ class _Parser(object):
+                 raise ParseError('null is not allowed to be used as an element'
+                                  ' in a repeated field at {0}.{1}[{2}]'.format(
+                                      path, name, index))
+-              getattr(message, field.name).append(
+-                  _ConvertScalarFieldValue(
+-                      item, field, '{0}.{1}[{2}]'.format(path, name, index)))
++              try:
++                getattr(message, field.name).append(
++                    _ConvertScalarFieldValue(
++                        item, field, '{0}.{1}[{2}]'.format(path, name, index)))
++              except ParseError as e:
++                if (field.cpp_type != descriptor.FieldDescriptor.CPPTYPE_ENUM or
++                    not self.ignore_unknown_fields):
++                  raise e
+         elif field.cpp_type == descriptor.FieldDescriptor.CPPTYPE_MESSAGE:
+           if field.is_extension:
+             sub_message = message.Extensions[field]
+@@ -618,10 +623,15 @@ class _Parser(object):
+             message.Extensions[field] = _ConvertScalarFieldValue(
+                 value, field, '{0}.{1}'.format(path, name))
+           else:
+-            setattr(
+-                message, field.name,
+-                _ConvertScalarFieldValue(value, field,
+-                                         '{0}.{1}'.format(path, name)))
++            try:
++              setattr(
++                  message, field.name,
++                  _ConvertScalarFieldValue(value, field,
++                                           '{0}.{1}'.format(path, name)))
++            except ParseError as e:
++              if (field.cpp_type != descriptor.FieldDescriptor.CPPTYPE_ENUM or
++                  not self.ignore_unknown_fields):
++                raise e
+       except ParseError as e:
+         if field and field.containing_oneof is None:
+           raise ParseError('Failed to parse {0} field: {1}.'.format(name, e))

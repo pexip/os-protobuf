@@ -10,3 +10,4 @@ python3ify_examples.patch
 no_errorprone.patch
 no_j2objc.patch
 no_javax.patch
+unknown_enums.patch
