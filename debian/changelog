@@ -1,3 +1,10 @@
+protobuf (3.20.2-1) experimental; urgency=high
+
+  * New upstream release:
+    - fix CVE-2022-1941: parsing vulnerability for the MessageSet type.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Wed, 28 Sep 2022 00:19:51 +0200
+
 protobuf (3.20.1-1pexip4) pexip-bullseye; urgency=medium
 
   * Bullseye rebuild for ARM64 inclusion
