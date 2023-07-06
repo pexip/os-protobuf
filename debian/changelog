@@ -1,3 +1,9 @@
+protobuf (3.21.12-3pexip1) pexip; urgency=medium
+
+  * New upstream release
+
+ -- Huw Jones <huw@pexip.com>  Thu, 06 Jul 2023 16:42:49 +0100
+
 protobuf (3.21.12-3) unstable; urgency=medium
 
   * Fix build-time tests on 32 bit architectures (closes: #1033998).
