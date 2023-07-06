@@ -15,9 +15,9 @@ Last-Update: 2022-03-11
 +import platform
 +
  from google.protobuf import any_pb2
+ from google.protobuf import struct_pb2
  from google.protobuf import any_test_pb2
- from google.protobuf import map_unittest_pb2
-@@ -1044,29 +1046,52 @@ class OnlyWorksWithProto2RightNowTests(T
+@@ -1050,29 +1052,52 @@ class OnlyWorksWithProto2RightNowTests(T
      all_data = message.SerializeToString()
      empty_message = unittest_pb2.TestEmptyMessage()
      empty_message.ParseFromString(all_data)

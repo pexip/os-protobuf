@@ -1,3 +1,89 @@
+protobuf (3.21.12-3) unstable; urgency=medium
+
+  * Fix build-time tests on 32 bit architectures (closes: #1033998).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 09 Apr 2023 05:50:55 +0000
+
+protobuf (3.21.12-2) unstable; urgency=medium
+
+  [ Helmut Grohne <helmut@subdivi.de> ]
+  * Reenable build-time testing (closes: #1033989).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Wed, 05 Apr 2023 21:57:20 +0200
+
+protobuf (3.21.12-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 17 Dec 2022 09:18:06 +0100
+
+protobuf (3.21.11-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 10 Dec 2022 09:53:49 +0100
+
+protobuf (3.21.10-1) unstable; urgency=medium
+
+  * New upstream release.
+  * Update Standards-Version to 4.6.1 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 04 Dec 2022 13:49:06 +0100
+
+protobuf (3.21.9-5) unstable; urgency=medium
+
+  * Backport upstream fix of Makefile rule for java target in examples
+    (closes: #1024677).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Fri, 25 Nov 2022 07:04:22 +0100
+
+protobuf (3.21.9-4) unstable; urgency=medium
+
+  * Don't try to build elpa-protobuf-mode on architectures where dh-elpa is
+    not available.
+  * Don't check alignment of typename U on hppa.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 22 Nov 2022 19:00:45 +0100
+
+protobuf (3.21.9-3) unstable; urgency=medium
+
+  * Upload to Sid (closes: #993266).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Mon, 21 Nov 2022 20:49:14 +0100
+
+protobuf (3.21.9-2) experimental; urgency=medium
+
+  * Backport upstream fix to build with Python 3.11 (closes: #1023963).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 13 Nov 2022 11:14:34 +0100
+
+protobuf (3.21.9-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 01 Nov 2022 07:09:22 +0100
+
+protobuf (3.21.8-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Fri, 21 Oct 2022 06:18:13 +0200
+
+protobuf (3.21.7-1) experimental; urgency=high
+
+  * New upstream release:
+    - fix CVE-2022-3171: potential denial of service in the Java protobuf
+      runtime.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Thu, 06 Oct 2022 21:03:23 +0200
+
+protobuf (3.21.6-1) experimental; urgency=medium
+
+  * New major upstream release (closes: #1018262).
+  * Library transition from libproto*31 to libproto*32 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Wed, 28 Sep 2022 14:34:55 +0200
+
 protobuf (3.20.2-1pexip1) pexip; urgency=medium
 
   * New upstream release.

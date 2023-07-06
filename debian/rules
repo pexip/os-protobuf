@@ -15,11 +15,15 @@ ifneq (,$(findstring $(DEB_BUILD_ARCH), armel m68k mips mipsel powerpc powerpcsp
 export DEB_LDFLAGS_MAINT_APPEND  = -latomic
 endif
 
-SONAME=31
+SONAME=32
 API_VERSION=$(SONAME)-0
 
 %:
+ifneq (,$(filter $(DEB_HOST_ARCH), amd64 arm64 armel armhf i386 mips64el mipsel ppc64el s390x hppa ppc64 riscv64 sh4 sparc64 x32))
 	dh $@ --with autoreconf,elpa
+else
+	dh $@ --with autoreconf -Nelpa-protobuf-mode
+endif
 
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 override_dh_auto_configure:
@@ -190,6 +194,3 @@ override_dh_installdocs-indep:
 
 override_dh_gencontrol:
 	dh_gencontrol -- -Vpb:API=${API_VERSION}
-
-override_dh_dwz:
-	echo GCC bug

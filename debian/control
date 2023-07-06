@@ -6,7 +6,7 @@ XSBC-Pexip-Original-Maintainer: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Build-Depends:
 # Debian build system
    debhelper-compat (= 13)
- , dh-elpa
+ , dh-elpa [amd64 arm64 armel armhf i386 mips64el mipsel ppc64el s390x hppa ppc64 riscv64 sh4 sparc64 x32]
 # C/C++
  , zlib1g-dev
  , libgmock-dev <!nocheck>
@@ -33,7 +33,7 @@ Build-Depends-Indep:
  , maven-repo-helper
  , libguava-java
  , libgoogle-gson-java
-Standards-Version: 4.6.0
+Standards-Version: 4.6.1
 Rules-Requires-Root: no
 Homepage: https://github.com/google/protobuf/
 XS-Ruby-Versions: all
@@ -64,7 +64,7 @@ Description: Protocol Buffers
  build process in this directory only installs the extension; you need to
  install protoc as well to have Ruby code generation functionality.
 
-Package: libprotobuf31
+Package: libprotobuf32
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -84,7 +84,7 @@ Description: protocol buffers C++ library
  .
  This package contains the runtime library needed for C++ applications.
 
-Package: libprotobuf-lite31
+Package: libprotobuf-lite32
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -109,7 +109,7 @@ Architecture: any
 Multi-Arch: same
 Section: libdevel
 Depends: ${misc:Depends}, zlib1g-dev,
- libprotobuf31 (= ${binary:Version}), libprotobuf-lite31 (= ${binary:Version})
+ libprotobuf32 (= ${binary:Version}), libprotobuf-lite32 (= ${binary:Version})
 Breaks: protobuf-compiler (<< ${binary:Version}), protobuf-compiler (>> ${binary:Version})
 Provides: protobuf-api-${pb:API}
 Description: protocol buffers C++ library (development files) and proto files
@@ -127,7 +127,7 @@ Description: protocol buffers C++ library (development files) and proto files
  This package contains the development headers and static libraries needed for
  writing C++ applications. Includes well known proto type files.
 
-Package: libprotoc31
+Package: libprotoc32
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -152,7 +152,7 @@ Architecture: any
 Multi-Arch: same
 Section: libdevel
 Depends: ${misc:Depends},
- libprotoc31 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
+ libprotoc32 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
 Replaces: libprotobuf-dev (<< 2.1.0)
 Breaks: libprotobuf-dev (<< 2.1.0)
 Description: protocol buffers compiler library (development files)
@@ -173,7 +173,7 @@ Description: protocol buffers compiler library (development files)
 Package: protobuf-compiler
 Architecture: any
 Multi-Arch: foreign
-Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc31 (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc32 (= ${binary:Version})
 Recommends: libprotobuf-dev
 Suggests: protobuf-mode-el
 Description: compiler for protocol buffer definition files
@@ -277,6 +277,7 @@ Description: Protocol buffers source code
 
 Package: php-google-protobuf
 Architecture: all
+Multi-Arch: foreign
 Section: php
 Depends: ${misc:Depends}, ${phpcomposer:Debian-require}
 Recommends: ${phpcomposer:Debian-recommend}
