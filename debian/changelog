@@ -1,3 +1,9 @@
+protobuf (3.21.12-3pexip3) pexip-bookworm; urgency=medium
+
+  * Initial bookworm build
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Thu, 16 Nov 2023 10:19:57 +0000
+
 protobuf (3.21.12-3pexip2) pexip; urgency=medium
 
   * No change rebuild
