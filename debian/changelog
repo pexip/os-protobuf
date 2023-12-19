@@ -1,3 +1,9 @@
+protobuf (3.21.12-3pexip5) pexip-bookworm; urgency=medium
+
+  * Rebuild for override changes
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Tue, 19 Dec 2023 14:19:32 +0000
+
 protobuf (3.21.12-3pexip4) pexip-bookworm; urgency=medium
 
   * Bookworm build for product distribution
