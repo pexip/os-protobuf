@@ -1,3 +1,3 @@
-usr/lib/*/libprotoc.a
-usr/lib/*/libprotoc.so
+usr/lib/${DEB_HOST_MULTIARCH}/libprotoc.a
+usr/lib/${DEB_HOST_MULTIARCH}/libprotoc.so
 usr/include/google/protobuf/compiler

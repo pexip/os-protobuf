@@ -9,35 +9,6 @@ Files: *
 Copyright: 2008-2021 Google Inc.
 License: BSD-3-Clause~Google
 
-Files: m4/ax_pthread.m4
-Copyright: 2006 Steven G. Johnson <stevenj@alum.mit.edu>
-           2011 Daniel Richard G. <skunk@iSKUNK.ORG>
-License: GPLWithACException
- This program is free software; you can redistribute it and/or modify it
- under the terms of the GNU General Public License as published by the Free
- Software Foundation. As a special exception, the respective Autoconf
- Macro's copyright owner gives unlimited permission to copy, distribute and
- modify the configure scripts that are the output of Autoconf when
- processing the Macro. You need not follow the terms of the GNU General
- Public License when using or distributing such scripts.
- .
- On Debian systems, the complete text of the GNU General Public
- License can be found in "/usr/share/common-licenses/GPL-2".
-Comment:
- Unspecified GPL, assuming any version as per text of the GPL-2 license:
-   "If the Program does not specify a version number of this License, you may
-    choose any version ever published by the Free Software Foundation."
-
-Files:
-    python/mox.py
-    python/stubout.py
-Copyright: 2008 Google Inc.
-License: Apache-2.0
-
-Files: conformance/third_party/jsoncpp/*
-Copyright: 2007-2011 Baptiste Lepilleur
-License: Public-Domain or Expat
-
 Files: debian/*
 Copyright:
     2009      Dirk Eddelbuettel <edd@debian.org>
@@ -48,6 +19,10 @@ Copyright:
     2016-     Laszlo Boszormenyi (GCS) <gcs@debian.org>
 License: GPL-3
 
+Files: debian/patches/soversion.patch
+Copyright: Antonio Rojas <arojas@archlinux.org>
+License: BSD-3-Clause
+
 Files: debian/patches/*
 Copyright:
     2016      Sebastiaan Couwenberg <sebastic@xs4all.nl>
@@ -55,6 +30,8 @@ Copyright:
     2019      Laurence Parry <greenreaper@gmail.com>
     2020-     Olek Wojnar <olek@debian.org>
     2016-     Laszlo Boszormenyi (GCS) <gcs@debian.org>
+License: BSD-3-Clause
+
 License: BSD-3-Clause
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions

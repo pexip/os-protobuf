@@ -1,17 +1,30 @@
-protobuf (3.21.12-11) unstable; urgency=high
+protobuf (3.25.4-1) experimental; urgency=medium
 
-  * Fix CVE-2024-7254: when parsing unknown fields in the Protobuf Java Lite
-    and Full library, a maliciously crafted message can cause a StackOverflow
-    error and lead to a program crash (closes: #1082381).
+  * New upstream release.
+  * Add libabsl-dev dependency on libprotobuf-dev (closes: #1079518).
 
- -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 29 Apr 2025 21:27:02 +0200
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 24 Aug 2024 17:56:32 +0200
 
-protobuf (3.21.12-10) unstable; urgency=medium
+protobuf (3.25.3-1) experimental; urgency=medium
 
-  * Disable Python self-testing for not being compatible with new setuptools
-    versions (closes: #1058327, #1080225).
+  * New upstream release.
+  * Remove python3-six build dependency (closes: #1064488).
 
- -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 13 Oct 2024 12:12:52 +0200
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 03 Mar 2024 12:42:49 +0100
+
+protobuf (3.25.2-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 16 Jan 2024 19:47:09 +0100
+
+protobuf (3.25.1-1) experimental; urgency=medium
+
+  * New major upstream release.
+  * Switch to CMake build system.
+  * Library transition from libproto*32 to libproto*25 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Mon, 20 Nov 2023 22:19:18 +0100
 
 protobuf (3.21.12-9) unstable; urgency=medium
 

@@ -15,23 +15,51 @@ ifneq (,$(findstring $(DEB_BUILD_ARCH), armel m68k mips mipsel powerpc powerpcsp
 export DEB_LDFLAGS_MAINT_APPEND  = -latomic
 endif
 
-SONAME=32
+SONAME=25
 API_VERSION=$(SONAME)-0
 
 %:
 	dh $@
 
-ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
+override_dh_clean:
+	$(RM) -rv gmock $(CURDIR)/build-static/ $(CURDIR)/build-shared/
+ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
+	sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+		>$(CURDIR)/google-protobuf.gemspec
+	cd ruby && rake clobber
+endif
+	dh_clean
+	$(RM) config.h config.log config.status
+	$(RM) *.pc
+	$(RM) google-protobuf.gemspec
+	$(RM) src/protoc
+	$(RM) libtool stamp-h1
+	$(RM) ruby/tests/basic_test_pb.rb \
+		ruby/tests/basic_test_proto2_pb.rb \
+		ruby/tests/generated_code_pb.rb \
+		ruby/tests/generated_code_proto2_pb.rb \
+		ruby/tests/google/protobuf/wrappers_pb.rb \
+		ruby/tests/test_import_pb.rb \
+		ruby/tests/test_import_proto2_pb.rb \
+		ruby/tests/test_ruby_package_pb.rb \
+		ruby/tests/test_ruby_package_proto2_pb.rb
+	$(RM) -r ruby/ext/google/protobuf_c/third_party/utf8_range/
+	find $(CURDIR) -name Makefile -delete
+
 override_dh_auto_configure:
+ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 	# build for the native (i.e. build) architecture, as we need
 	# the protoc compiler for the native arch.
-	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure
+	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure -- -DBUILD_SHARED_LIBS=ON -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF
 
 PYTHON_CROSS_VARS += PROTOC=$(CURDIR)/debian/run_protoc
 PYTHON_CROSS_VARS += PYTHONPATH=/usr/lib/python$$pv/plat-$(DEB_HOST_MULTIARCH)
 PYTHON_CROSS_VARS += _PYTHON_HOST_PLATFORM=$(DEB_HOST_ARCH_OS)-$(DEB_HOST_GNU_CPU)
 PYTHON_CROSS_VARS += CC=$(CXX)
 PYTHON_CROSS_VARS += CXX=$(CXX)
+else
+	dh_auto_configure --builddir=build-static/ -- -DBUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
+	dh_auto_configure --builddir=build-shared/ -- -DBUILD_SHARED_LIBS=ON  -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
 endif
 
 override_dh_auto_build-arch:
@@ -39,8 +67,11 @@ override_dh_auto_build-arch:
 ## be built. First we build it normally; then "generate_descriptor_proto.sh"
 ## generates .pb.go files and replaces 'em if they are different as well as
 ## invokes "make protoc" which re-builds "src/protoc" if required.
-	dh_auto_build --arch
-	bash -x ./generate_descriptor_proto.sh
+	dh_auto_build --arch --builddir=build-static
+	dh_auto_build --arch --builddir=build-shared
+	PROTOC=$(CURDIR)/build-shared/protoc \
+	       bash -x ./generate_descriptor_proto.sh \
+	       --bootstrap_protoc $(CURDIR)/build-shared/protoc
 
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 	# save the native compiler
@@ -57,55 +88,45 @@ endif
 
 ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 build
-	cp -rv python python3
-	set -e; cd python3 && for pv in $(shell py3versions -vr); do \
-		$(PYTHON_CROSS_VARS) python$$pv setup.py build --cpp_implementation; \
+#	cp -rv python python3
+#	export LDFLAGS=-L$(CURDIR)/build-shared/;
+	set -e; \
+	cd python && for pv in $(shell py3versions -vr); do \
+		$(PYTHON_CROSS_VARS) \
+		LDFLAGS=-L$(CURDIR)/build-shared/ \
+		PROTOC=$(CURDIR)/build-shared/protoc \
+		python$$pv setup.py build --cpp_implementation; \
 	done
 endif
 
 ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
 	# Ruby build
-	cd ruby && rake package genproto
+	sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+		>$(CURDIR)/google-protobuf.gemspec
+	cd ruby && \
+	PROTOC=$(CURDIR)/build-shared/protoc \
+	rake package genproto
 endif
 
 override_dh_auto_build-indep:
-	dh_auto_build --indep
+	dh_auto_build --builddir=build-shared/ --indep
 
+	# Java build will use this path for protoc, maybe set PROTOC?
+	ln -s $(CURDIR)/build-shared/protoc $(CURDIR)/src/
 	# Java build
 	ant -f debian/java-build.xml jar jar-util
 
-override_dh_clean:
-	$(RM) -rv gmock
-ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
-	cd ruby && rake clobber
-endif
-	dh_clean
-	$(RM) config.h config.log config.status
-	$(RM) *.pc
-	$(RM) google-protobuf.gemspec
-	$(RM) libtool stamp-h1
-	$(RM) ruby/tests/basic_test_pb.rb \
-		ruby/tests/basic_test_proto2_pb.rb \
-		ruby/tests/generated_code_pb.rb \
-		ruby/tests/generated_code_proto2_pb.rb \
-		ruby/tests/google/protobuf/wrappers_pb.rb \
-		ruby/tests/test_import_pb.rb \
-		ruby/tests/test_import_proto2_pb.rb \
-		ruby/tests/test_ruby_package_pb.rb \
-		ruby/tests/test_ruby_package_proto2_pb.rb
-	$(RM) -r ruby/ext/google/protobuf_c/third_party/utf8_range/
-	find $(CURDIR) -name Makefile -delete
-
 override_dh_auto_test-arch:
-	dh_auto_test --arch
+	dh_auto_test --builddir=build-shared/ --arch
 
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS))$(filter nopython,$(DEB_BUILD_PROFILES)))
     # Python3 test
 #	set -e; \
-	export LD_LIBRARY_PATH=$(CURDIR)/src/.libs; \
-	cd python3 && for PYTHON in $(shell py3versions -r); do \
+	cd python && for PYTHON in $(shell py3versions -r); do \
+		LD_LIBRARY_PATH=$(CURDIR)/build-shared/ \
 		$$PYTHON setup.py test --cpp_implementation; \
 	done
+	@echo Python testing is gone...
 endif
 
 override_dh_auto_test-indep:
@@ -115,7 +136,7 @@ override_dh_auto_clean-arch:
 	dh_auto_clean --arch
 
 	# Python3 clean
-	$(RM) -r $(CURDIR)/python3
+	#$(RM) -r $(CURDIR)/python3
 
 override_dh_auto_clean-indep:
 	dh_auto_clean --indep
@@ -125,12 +146,13 @@ override_dh_auto_clean-indep:
 	mh_clean || true
 
 override_dh_auto_install-arch:
-	dh_auto_install --arch
+	dh_auto_install --builddir=build-static/ --arch
+	dh_auto_install --builddir=build-shared/ --arch
 
 ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 install
 	set -e; \
-	cd python3 && for pv in $(shell py3versions -vr); do \
+	cd python && for pv in $(shell py3versions -vr); do \
 		$(PYTHON_CROSS_VARS) python$$pv setup.py install --cpp_implementation \
 			--install-layout=deb --no-compile \
 			--root=$(CURDIR)/debian/python3-protobuf; \
@@ -148,7 +170,7 @@ ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
 endif
 
 override_dh_auto_install-indep:
-	dh_auto_install --indep
+	dh_auto_install --builddir=build-shared/ --indep
 
 	# Java install
 	mh_install
@@ -158,9 +180,9 @@ override_dh_install-arch:
 
 	# Convert doc dir to symlink for the -dev packages
 	$(RM) -r $(CURDIR)/debian/libprotobuf-dev/usr/share/doc/libprotobuf-dev
-	ln -s libprotobuf$(SONAME)t64 $(CURDIR)/debian/libprotobuf-dev/usr/share/doc/libprotobuf-dev
+	ln -s libprotobuf$(SONAME) $(CURDIR)/debian/libprotobuf-dev/usr/share/doc/libprotobuf-dev
 	$(RM) -r $(CURDIR)/debian/libprotoc-dev/usr/share/doc/libprotoc-dev
-	ln -s libprotoc$(SONAME)t64 $(CURDIR)/debian/libprotoc-dev/usr/share/doc/libprotoc-dev
+	ln -s libprotoc$(SONAME) $(CURDIR)/debian/libprotoc-dev/usr/share/doc/libprotoc-dev
 
 	# Remove compiler headers from libprotobuf-dev
 	$(RM) -r $(CURDIR)/debian/libprotobuf-dev/usr/include/google/protobuf/compiler
@@ -184,3 +206,5 @@ execute_after_dh_link-indep:
 
 override_dh_gencontrol:
 	dh_gencontrol -- -Vpb:API=${API_VERSION}
+
+.PHONY: override_dh_clean override_dh_auto_configure override_dh_auto_build-arch override_dh_auto_test-arch
