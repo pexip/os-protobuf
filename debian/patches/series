@@ -16,3 +16,6 @@ Fix_rule_for_java_target.patch
 build_32_bit_tests.patch
 fix_C++_32bit_tests.patch
 fix_Python_32bit_tests.patch
+test_scope_for_junit.patch
+stop_using_backward_compatibility_timezones.patch
+python3.12.diff
