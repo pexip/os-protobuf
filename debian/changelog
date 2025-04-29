@@ -1,3 +1,11 @@
+protobuf (3.21.12-11) unstable; urgency=high
+
+  * Fix CVE-2024-7254: when parsing unknown fields in the Protobuf Java Lite
+    and Full library, a maliciously crafted message can cause a StackOverflow
+    error and lead to a program crash (closes: #1082381).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Tue, 29 Apr 2025 21:27:02 +0200
+
 protobuf (3.21.12-10) unstable; urgency=medium
 
   * Disable Python self-testing for not being compatible with new setuptools
