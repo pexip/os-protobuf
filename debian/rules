@@ -7,9 +7,9 @@
 include /usr/share/dpkg/architecture.mk
 include /usr/share/dpkg/buildtools.mk
 
-export DH_RUBY = --gem-install
-export DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR = debian/ruby-google-protobuf
-export GEM2DEB_TEST_RUNNER = --check-dependencies
+#export DH_RUBY = --gem-install
+#export DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR = debian/ruby-google-protobuf
+#export GEM2DEB_TEST_RUNNER = --check-dependencies
 
 ifneq (,$(findstring $(DEB_BUILD_ARCH), armel m68k mips mipsel powerpc powerpcspe sh4))
 export DEB_LDFLAGS_MAINT_APPEND  = -latomic
@@ -74,10 +74,10 @@ ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	done
 endif
 
-ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
-	# Ruby build
-	cd ruby && rake package genproto
-endif
+#ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
+#	# Ruby build
+#	cd ruby && rake package genproto
+#endif
 
 override_dh_auto_build-indep:
 	dh_auto_build --indep
@@ -87,9 +87,9 @@ override_dh_auto_build-indep:
 
 override_dh_clean:
 	$(RM) -rv gmock
-ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
-	cd ruby && rake clobber
-endif
+#ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
+#	cd ruby && rake clobber
+#endif
 	dh_clean
 	$(RM) config.h config.log config.status
 	$(RM) *.pc
@@ -150,14 +150,14 @@ ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	find $(CURDIR)/debian/python3-protobuf -name 'protobuf-*-nspkg.pth' -delete
 endif
 
-ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
-	# Ruby install
-	 sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
-		 >$(CURDIR)/google-protobuf.gemspec
-	dh_auto_install -O--buildsystem=ruby -O--package=ruby-google-protobuf --destdir=$(CURDIR)/debian/ruby-google-protobuf
-	find $(CURDIR)/debian/ruby-google-protobuf/usr/lib/ \
-		-name well_known_types.rb -exec chmod a+x {} \;
-endif
+#ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
+#	# Ruby install
+#	 sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+#		 >$(CURDIR)/google-protobuf.gemspec
+#	dh_auto_install -O--buildsystem=ruby -O--package=ruby-google-protobuf --destdir=$(CURDIR)/debian/ruby-google-protobuf
+#	find $(CURDIR)/debian/ruby-google-protobuf/usr/lib/ \
+#		-name well_known_types.rb -exec chmod a+x {} \;
+#endif
 
 override_dh_auto_install-indep:
 	dh_auto_install --indep
