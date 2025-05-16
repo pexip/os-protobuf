@@ -19,4 +19,5 @@ fix_Python_32bit_tests.patch
 test_scope_for_junit.patch
 stop_using_backward_compatibility_timezones.patch
 python3.12.diff
+CVE-2024-7254.patch
 unknown_enums.patch
