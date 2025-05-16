@@ -1,3 +1,9 @@
+protobuf (3.21.12-11+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Fri, 16 May 2025 10:12:42 +0100
+
 protobuf (3.21.12-11) unstable; urgency=high
 
   * Fix CVE-2024-7254: when parsing unknown fields in the Protobuf Java Lite
