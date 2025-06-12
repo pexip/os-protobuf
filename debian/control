@@ -8,6 +8,7 @@ Build-Depends: dpkg-dev (>= 1.22.5),
    debhelper-compat (= 13)
 # C/C++
  , cmake
+ , libabsl-dev
  , zlib1g-dev
  , libgmock-dev <!nocheck>
  , libgtest-dev <!nocheck>
