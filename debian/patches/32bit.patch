@@ -8,7 +8,7 @@ Last-Update: 2022-03-11
 
 --- a/python/google/protobuf/internal/text_format_test.py
 +++ b/python/google/protobuf/internal/text_format_test.py
-@@ -39,6 +39,8 @@ import textwrap
+@@ -16,6 +16,8 @@ import textwrap
  
  import unittest
  
@@ -16,8 +16,8 @@ Last-Update: 2022-03-11
 +
  from google.protobuf import any_pb2
  from google.protobuf import struct_pb2
- from google.protobuf import any_test_pb2
-@@ -1050,29 +1052,52 @@ class OnlyWorksWithProto2RightNowTests(T
+ from google.protobuf import descriptor_pb2
+@@ -1085,29 +1087,52 @@ class OnlyWorksWithProto2RightNowTests(T
      all_data = message.SerializeToString()
      empty_message = unittest_pb2.TestEmptyMessage()
      empty_message.ParseFromString(all_data)

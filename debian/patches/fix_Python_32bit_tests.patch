@@ -9,7 +9,7 @@ Last-Update: 2023-04-07
 
 --- protobuf-3.21.12.orig/python/google/protobuf/internal/descriptor_test.py
 +++ protobuf-3.21.12/python/google/protobuf/internal/descriptor_test.py
-@@ -32,6 +32,7 @@
+@@ -9,6 +9,7 @@
  
  __author__ = 'robinson@google.com (Will Robinson)'
  
@@ -17,7 +17,7 @@ Last-Update: 2023-04-07
  import unittest
  import warnings
  
-@@ -269,16 +270,18 @@ class DescriptorTest(unittest.TestCase):
+@@ -356,16 +357,18 @@
          unittest_custom_options_pb2.int32_opt])
      self.assertEqual(kint64max, message_options.Extensions[
          unittest_custom_options_pb2.int64_opt])
@@ -42,7 +42,7 @@ Last-Update: 2023-04-07
      self.assertEqual(kint32max, message_options.Extensions[
 --- protobuf-3.21.12.orig/python/google/protobuf/internal/json_format_test.py
 +++ protobuf-3.21.12/python/google/protobuf/internal/json_format_test.py
-@@ -59,7 +59,7 @@ class JsonFormatBase(unittest.TestCase):
+@@ -38,7 +38,7 @@ class JsonFormatBase(unittest.TestCase):
    def FillAllFields(self, message):
      message.int32_value = 20
      message.int64_value = -20
@@ -51,35 +51,26 @@ Last-Update: 2023-04-07
      message.uint64_value = 12345678900
      message.float_value = float('-inf')
      message.double_value = 3.1415
-@@ -127,7 +127,7 @@ class JsonFormatTest(JsonFormatBase):
-     message = json_format_proto3_pb2.TestMessage()
-     text = ('{"int32Value": 20, '
-             '"int64Value": "-20", '
--            '"uint32Value": 3120987654,'
-+            '"uint32Value": 2147483647,'
-             '"uint64Value": "12345678900",'
-             '"floatValue": "-Infinity",'
-             '"doubleValue": 3.1415,'
-@@ -140,7 +140,7 @@ class JsonFormatTest(JsonFormatBase):
-             '"repeatedInt64Value": ["9007199254740992", "-9007199254740992"],'
-             '"repeatedUint32Value": [268435455, 134217727],'
-             '"repeatedUint64Value": ["9007199254740992", "9007199254740991"],'
--            '"repeatedFloatValue": [0],'
-+            '"repeatedFloatValue": [0.0],'
-             '"repeatedDoubleValue": [1e-15, "Infinity"],'
-             '"repeatedBoolValue": [true, false],'
-             '"repeatedStringValue": ["Few symbols!#$,;", "bar"],'
+@@ -107,7 +107,7 @@   def testAllFieldsToJson(self):
+     text = (
+         '{"int32Value": 20, '
+         '"int64Value": "-20", '
+-        '"uint32Value": 3120987654,'
++        '"uint32Value": 2147483647,'
+         '"uint64Value": "12345678900",'
+         '"floatValue": "-Infinity",'
+         '"doubleValue": 3.1415,'
 --- protobuf-3.21.12.orig/python/google/protobuf/internal/reflection_test.py
 +++ protobuf-3.21.12/python/google/protobuf/internal/reflection_test.py
-@@ -36,6 +36,7 @@ pure-Python protocol compiler.
+@@ -13,6 +13,7 @@ pure-Python protocol compiler.
  import copy
  import gc
  import operator
 +import platform
  import struct
  import sys
- import warnings
-@@ -453,7 +454,8 @@ class ReflectionTest(unittest.TestCase):
+ import unittest
+@@ -425,7 +426,8 @@  def assetIntegerBoundsChecking(self, integer_fn, message_module):
                          expected_max + 1)
  
      TestMinAndMaxIntegers('optional_int32', -(1 << 31), (1 << 31) - 1)
@@ -91,7 +82,7 @@ Last-Update: 2023-04-07
      # A bit of white-box testing since -1 is an int and not a long in C++ and
 --- protobuf-3.21.12.orig/python/google/protobuf/internal/text_format_test.py
 +++ protobuf-3.21.12/python/google/protobuf/internal/text_format_test.py
-@@ -39,8 +39,6 @@ import textwrap
+@@ -16,8 +16,6 @@ import textwrap
  
  import unittest
  
@@ -99,8 +90,8 @@ Last-Update: 2023-04-07
 -
  from google.protobuf import any_pb2
  from google.protobuf import struct_pb2
- from google.protobuf import any_test_pb2
-@@ -1052,52 +1050,29 @@ class OnlyWorksWithProto2RightNowTests(T
+ from google.protobuf import descriptor_pb2
+@@ -1087,52 +1085,29 @@ class OnlyWorksWithProto2RightNowTests(T
      all_data = message.SerializeToString()
      empty_message = unittest_pb2.TestEmptyMessage()
      empty_message.ParseFromString(all_data)

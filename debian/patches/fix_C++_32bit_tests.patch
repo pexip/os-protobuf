@@ -9,12 +9,12 @@ Last-Update: 2023-04-07
 
 --- protobuf-3.21.12.orig/src/google/protobuf/any_test.cc
 +++ protobuf-3.21.12/src/google/protobuf/any_test.cc
-@@ -62,9 +62,14 @@ TEST(AnyTest, TestPackAndUnpack) {
- 
- TEST(AnyTest, TestPackFromSerializationExceedsSizeLimit) {
-   protobuf_unittest::TestAny submessage;
+@@ -44,9 +44,14 @@ TEST(AnyTest, TestPackAndUnpack) {
+     GTEST_SKIP() << "This toolchain can't allocate that much memory.";
+   }
+   proto2_unittest::TestAny submessage;
 -  submessage.mutable_text()->resize(INT_MAX, 'a');
-   protobuf_unittest::TestAny message;
+   proto2_unittest::TestAny message;
 -  EXPECT_FALSE(message.mutable_any_value()->PackFrom(submessage));
 +  try {
 +    submessage.mutable_text()->resize(INT_MAX, 'a');
@@ -28,7 +28,7 @@ Last-Update: 2023-04-07
  TEST(AnyTest, TestUnpackWithTypeMismatch) {
 --- protobuf-3.21.12.orig/src/google/protobuf/arena_unittest.cc
 +++ protobuf-3.21.12/src/google/protobuf/arena_unittest.cc
-@@ -1375,11 +1375,11 @@ TEST(ArenaTest, SpaceAllocated_and_Used)
+@@ -1663,11 +1663,11 @@ TEST(ArenaTest, SpaceAllocated_and_Used)
    options.initial_block_size = arena_block.size();
    Arena arena_2(options);
    EXPECT_EQ(1024, arena_2.SpaceAllocated());
@@ -42,7 +42,7 @@ Last-Update: 2023-04-07
    EXPECT_EQ(1024, arena_2.Reset());
  }
  
-@@ -1418,11 +1418,11 @@ TEST(ArenaTest, BlockSizeSmallerThanAllo
+@@ -1748,11 +1748,11 @@ TEST(ArenaTest, BlockSizeSmallerThanAllo
  
      *Arena::Create<int64_t>(&arena) = 42;
      EXPECT_GE(arena.SpaceAllocated(), 8);

@@ -11,7 +11,7 @@ Last-Update: 2020-03-24
 -#! /usr/bin/env python
 +#! /usr/bin/env python3
  
- # See README.txt for information and build instructions.
+ # See README.md for information and build instructions.
  
 --- protobuf-3.11.4.orig/examples/list_people.py
 +++ protobuf-3.11.4/examples/list_people.py
@@ -19,5 +19,5 @@ Last-Update: 2020-03-24
 -#! /usr/bin/env python
 +#! /usr/bin/env python3
  
- # See README.txt for information and build instructions.
+ # See README.md for information and build instructions.
  

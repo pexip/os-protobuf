@@ -6,13 +6,12 @@ Last-Update: 2022-03-11
 
 --- protobuf-3.9.1.orig/src/google/protobuf/compiler/command_line_interface.cc
 +++ protobuf-3.9.1/src/google/protobuf/compiler/command_line_interface.cc
-@@ -58,6 +58,9 @@
- #include <iostream>
- 
- #include <limits.h>  // For PATH_MAX
+@@ -14,4 +14,8 @@
+ #include <errno.h>
+ #include <limits.h>
 +#if defined(__GNU__)
 +#define PATH_MAX 4096
 +#endif
- 
- #include <memory>
- 
++
+ #include <stdio.h>
+ #include <stdlib.h>
