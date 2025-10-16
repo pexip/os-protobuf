@@ -10,9 +10,11 @@ Last-Update: 2022-03-11
 
 ---
 
---- a/ruby/ext/google/protobuf_c/wrap_memcpy.c
-+++ b/ruby/ext/google/protobuf_c/wrap_memcpy.c
-@@ -39,7 +39,7 @@
+Index: protobuf/ruby/ext/google/protobuf_c/wrap_memcpy.c
+===================================================================
+--- protobuf.orig/ruby/ext/google/protobuf_c/wrap_memcpy.c
++++ protobuf/ruby/ext/google/protobuf_c/wrap_memcpy.c
+@@ -16,7 +16,7 @@
  // This wrapper is enabled by passing the linker flags -Wl,-wrap,memcpy in
  // extconf.rb.
  #ifdef __linux__

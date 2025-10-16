@@ -5,16 +5,20 @@ Last-Update: 2023-12-26
 
 ---
 
---- protobuf-3.11.4.orig/examples/add_person.py
-+++ protobuf-3.11.4/examples/add_person.py
+Index: protobuf/examples/add_person.py
+===================================================================
+--- protobuf.orig/examples/add_person.py
++++ protobuf/examples/add_person.py
 @@ -1,4 +1,4 @@
 -#! /usr/bin/env python
 +#! /usr/bin/env python3
  
  # See README.md for information and build instructions.
  
---- protobuf-3.11.4.orig/examples/list_people.py
-+++ protobuf-3.11.4/examples/list_people.py
+Index: protobuf/examples/list_people.py
+===================================================================
+--- protobuf.orig/examples/list_people.py
++++ protobuf/examples/list_people.py
 @@ -1,4 +1,4 @@
 -#! /usr/bin/env python
 +#! /usr/bin/env python3
