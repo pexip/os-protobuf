@@ -1,4 +1,4 @@
-protobuf (3.31.1.0+pexip25u1) pexip-trixie; urgency=medium
+protobuf (3.31.1-0+pexip25u1) pexip-trixie; urgency=medium
 
   * Import 3.31.1 upstream tarball from github.
   * Fix up library install paths
