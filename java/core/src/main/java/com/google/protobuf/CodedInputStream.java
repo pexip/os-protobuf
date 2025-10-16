@@ -43,7 +43,9 @@ public abstract class CodedInputStream {
   private static volatile int defaultRecursionLimit = 100;
 
   /** Visible for subclasses. See setRecursionLimit() */
-  int recursionDepth;
+  int messageDepth;
+
+  int groupDepth;
 
   int recursionLimit = defaultRecursionLimit;
 
@@ -173,10 +175,22 @@ public abstract class CodedInputStream {
   }
 
   public void checkRecursionLimit() throws InvalidProtocolBufferException {
-    if (recursionDepth >= recursionLimit) {
+    if (messageDepth + groupDepth >= recursionLimit) {
       throw InvalidProtocolBufferException.recursionLimitExceeded();
     }
   }
+
+  /**
+   * Verifies that the last tag was 0 if we aren't inside a group.
+   *
+   * @throws InvalidProtocolBufferException The last tag was not 0 and we aren't inside a group.
+   */
+  public void checkValidEndTag() throws InvalidProtocolBufferException {
+    if (groupDepth == 0) {
+      checkLastTagWas(0);
+    }
+  }
+
   /** Disable construction/inheritance outside of this class. */
   private CodedInputStream() {}
 
@@ -223,13 +237,41 @@ public abstract class CodedInputStream {
    * Reads and discards an entire message. This will read either until EOF or until an endgroup tag,
    * whichever comes first.
    */
-  public abstract void skipMessage() throws IOException;
+  public void skipMessage() throws IOException {
+    while (true) {
+      final int tag = readTag();
+      if (tag == 0) {
+        return;
+      }
+      checkRecursionLimit();
+      ++groupDepth;
+      boolean fieldSkipped = skipField(tag);
+      --groupDepth;
+      if (!fieldSkipped) {
+        return;
+      }
+    }
+  }
 
   /**
    * Reads an entire message and writes it to output in wire format. This will read either until EOF
    * or until an endgroup tag, whichever comes first.
    */
-  public abstract void skipMessage(CodedOutputStream output) throws IOException;
+  public void skipMessage(CodedOutputStream output) throws IOException {
+    while (true) {
+      final int tag = readTag();
+      if (tag == 0) {
+        return;
+      }
+      checkRecursionLimit();
+      ++groupDepth;
+      boolean fieldSkipped = skipField(tag, output);
+      --groupDepth;
+      if (!fieldSkipped) {
+        return;
+      }
+    }
+  }
 
   // -----------------------------------------------------------------
 
@@ -639,6 +681,7 @@ public abstract class CodedInputStream {
               WireFormat.makeTag(WireFormat.getTagFieldNumber(tag), WireFormat.WIRETYPE_END_GROUP));
           return true;
         case WireFormat.WIRETYPE_END_GROUP:
+          checkValidEndTag();
           return false;
         case WireFormat.WIRETYPE_FIXED32:
           skipRawBytes(FIXED32_SIZE);
@@ -685,6 +728,7 @@ public abstract class CodedInputStream {
           }
         case WireFormat.WIRETYPE_END_GROUP:
           {
+            checkValidEndTag();
             return false;
           }
         case WireFormat.WIRETYPE_FIXED32:
@@ -696,26 +740,6 @@ public abstract class CodedInputStream {
           }
         default:
           throw InvalidProtocolBufferException.invalidWireType();
-      }
-    }
-
-    @Override
-    public void skipMessage() throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag)) {
-          return;
-        }
-      }
-    }
-
-    @Override
-    public void skipMessage(CodedOutputStream output) throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag, output)) {
-          return;
-        }
       }
     }
 
@@ -806,10 +830,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
     }
 
     @Override
@@ -819,10 +843,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
       return result;
     }
 
@@ -840,10 +864,10 @@ public abstract class CodedInputStream {
       final int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -856,10 +880,10 @@ public abstract class CodedInputStream {
       int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -1160,7 +1184,8 @@ public abstract class CodedInputStream {
       }
       byteLimit += getTotalBytesRead();
       if (byteLimit < 0) {
-        throw InvalidProtocolBufferException.parseFailure();
+        // Check for for integer overflow in byteLimit
+        throw InvalidProtocolBufferException.sizeLimitExceeded();
       }
       final int oldLimit = currentLimit;
       if (byteLimit > oldLimit) {
@@ -1297,7 +1322,8 @@ public abstract class CodedInputStream {
     }
 
     private UnsafeDirectNioDecoder(ByteBuffer buffer, boolean immutable) {
-      this.buffer = buffer;
+      // Duplicate to avoid non-threadsafe modifications in slice()
+      this.buffer = buffer.duplicate();
       address = UnsafeUtil.addressOffset(buffer);
       limit = address + buffer.limit();
       pos = address + buffer.position();
@@ -1351,6 +1377,7 @@ public abstract class CodedInputStream {
               WireFormat.makeTag(WireFormat.getTagFieldNumber(tag), WireFormat.WIRETYPE_END_GROUP));
           return true;
         case WireFormat.WIRETYPE_END_GROUP:
+          checkValidEndTag();
           return false;
         case WireFormat.WIRETYPE_FIXED32:
           skipRawBytes(FIXED32_SIZE);
@@ -1397,6 +1424,7 @@ public abstract class CodedInputStream {
           }
         case WireFormat.WIRETYPE_END_GROUP:
           {
+            checkValidEndTag();
             return false;
           }
         case WireFormat.WIRETYPE_FIXED32:
@@ -1408,26 +1436,6 @@ public abstract class CodedInputStream {
           }
         default:
           throw InvalidProtocolBufferException.invalidWireType();
-      }
-    }
-
-    @Override
-    public void skipMessage() throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag)) {
-          return;
-        }
-      }
-    }
-
-    @Override
-    public void skipMessage(CodedOutputStream output) throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag, output)) {
-          return;
-        }
       }
     }
 
@@ -1523,10 +1531,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
     }
 
     @Override
@@ -1536,10 +1544,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
       return result;
     }
 
@@ -1557,10 +1565,10 @@ public abstract class CodedInputStream {
       final int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -1573,10 +1581,10 @@ public abstract class CodedInputStream {
       int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -2005,6 +2013,7 @@ public abstract class CodedInputStream {
   private static final class StreamDecoder extends CodedInputStream {
     private final InputStream input;
     private final byte[] buffer;
+
     /** bufferSize represents how many bytes are currently filled in the buffer */
     private int bufferSize;
 
@@ -2116,6 +2125,7 @@ public abstract class CodedInputStream {
               WireFormat.makeTag(WireFormat.getTagFieldNumber(tag), WireFormat.WIRETYPE_END_GROUP));
           return true;
         case WireFormat.WIRETYPE_END_GROUP:
+          checkValidEndTag();
           return false;
         case WireFormat.WIRETYPE_FIXED32:
           skipRawBytes(FIXED32_SIZE);
@@ -2162,6 +2172,7 @@ public abstract class CodedInputStream {
           }
         case WireFormat.WIRETYPE_END_GROUP:
           {
+            checkValidEndTag();
             return false;
           }
         case WireFormat.WIRETYPE_FIXED32:
@@ -2173,26 +2184,6 @@ public abstract class CodedInputStream {
           }
         default:
           throw InvalidProtocolBufferException.invalidWireType();
-      }
-    }
-
-    @Override
-    public void skipMessage() throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag)) {
-          return;
-        }
-      }
-    }
-
-    @Override
-    public void skipMessage(CodedOutputStream output) throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag, output)) {
-          return;
-        }
       }
     }
 
@@ -2325,10 +2316,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
     }
 
     @Override
@@ -2338,10 +2329,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
       return result;
     }
 
@@ -2359,10 +2350,10 @@ public abstract class CodedInputStream {
       final int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -2375,10 +2366,10 @@ public abstract class CodedInputStream {
       int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -2439,7 +2430,7 @@ public abstract class CodedInputStream {
         throw InvalidProtocolBufferException.negativeSize();
       }
       // Slow path: Build a byte array first then copy it.
-      
+
       // We must copy as the byte array was handed off to the InputStream and a malicious
       // implementation could retain a reference.
       return ByteBuffer.wrap(readRawBytesSlowPath(size, /* ensureNoLeakedReferences= */ true));
@@ -2688,6 +2679,10 @@ public abstract class CodedInputStream {
         throw InvalidProtocolBufferException.negativeSize();
       }
       byteLimit += totalBytesRetired + pos;
+      if (byteLimit < 0) {
+        // Check for for integer overflow in byteLimit
+        throw InvalidProtocolBufferException.sizeLimitExceeded();
+      }
       final int oldLimit = currentLimit;
       if (byteLimit > oldLimit) {
         throw InvalidProtocolBufferException.truncatedMessage();
@@ -2854,12 +2849,12 @@ public abstract class CodedInputStream {
     /**
      * Exactly like readRawBytes, but caller must have already checked the fast path: (size <=
      * (bufferSize - pos) && size > 0)
-     * 
-     * If ensureNoLeakedReferences is true, the value is guaranteed to have not escaped to
+     *
+     * <p>If ensureNoLeakedReferences is true, the value is guaranteed to have not escaped to
      * untrusted code.
      */
-    private byte[] readRawBytesSlowPath(
-        final int size, boolean ensureNoLeakedReferences) throws IOException {
+    private byte[] readRawBytesSlowPath(final int size, boolean ensureNoLeakedReferences)
+        throws IOException {
       // Attempt to read the data in one byte array when it's safe to do.
       byte[] result = readRawBytesSlowPathOneChunk(size);
       if (result != null) {
@@ -2959,8 +2954,8 @@ public abstract class CodedInputStream {
 
     /**
      * Reads the remaining data in small chunks from the input stream.
-     * 
-     * Returns a byte[] that may have escaped to user code via InputStream APIs.
+     *
+     * <p>Returns a byte[] that may have escaped to user code via InputStream APIs.
      */
     private List<byte[]> readRawBytesSlowPathRemainingChunks(int sizeLeft) throws IOException {
       // The size is very large.  For security reasons, we can't allocate the
@@ -3030,7 +3025,7 @@ public abstract class CodedInputStream {
         System.arraycopy(chunk, 0, bytes, tempPos, chunk.length);
         tempPos += chunk.length;
       }
-      
+
       return ByteString.wrap(bytes);
     }
 
@@ -3118,41 +3113,54 @@ public abstract class CodedInputStream {
   private static final class IterableDirectByteBufferDecoder extends CodedInputStream {
     /** The object that need to decode. */
     private final Iterable<ByteBuffer> input;
+
     /** The {@link Iterator} with type {@link ByteBuffer} of {@code input} */
     private final Iterator<ByteBuffer> iterator;
+
     /** The current ByteBuffer; */
     private ByteBuffer currentByteBuffer;
+
     /**
      * If {@code true}, indicates that all the buffers are backing a {@link ByteString} and are
      * therefore considered to be an immutable input source.
      */
     private final boolean immutable;
+
     /**
      * If {@code true}, indicates that calls to read {@link ByteString} or {@code byte[]}
      * <strong>may</strong> return slices of the underlying buffer, rather than copies.
      */
     private boolean enableAliasing;
+
     /** The global total message length limit */
     private int totalBufferSize;
+
     /** The amount of available data in the input beyond {@link #currentLimit}. */
     private int bufferSizeAfterCurrentLimit;
+
     /** The absolute position of the end of the current message. */
     private int currentLimit = Integer.MAX_VALUE;
+
     /** The last tag that was read from this stream. */
     private int lastTag;
+
     /** Total Bytes have been Read from the {@link Iterable} {@link ByteBuffer} */
     private int totalBytesRead;
+
     /** The start position offset of the whole message, used as to reset the totalBytesRead */
     private int startOffset;
+
     /** The current position for current ByteBuffer */
     private long currentByteBufferPos;
 
     private long currentByteBufferStartPos;
+
     /**
      * If the current ByteBuffer is unsafe-direct based, currentAddress is the start address of this
      * ByteBuffer; otherwise should be zero.
      */
     private long currentAddress;
+
     /** The limit position for current ByteBuffer */
     private long currentByteBufferLimit;
 
@@ -3247,6 +3255,7 @@ public abstract class CodedInputStream {
               WireFormat.makeTag(WireFormat.getTagFieldNumber(tag), WireFormat.WIRETYPE_END_GROUP));
           return true;
         case WireFormat.WIRETYPE_END_GROUP:
+          checkValidEndTag();
           return false;
         case WireFormat.WIRETYPE_FIXED32:
           skipRawBytes(FIXED32_SIZE);
@@ -3293,6 +3302,7 @@ public abstract class CodedInputStream {
           }
         case WireFormat.WIRETYPE_END_GROUP:
           {
+            checkValidEndTag();
             return false;
           }
         case WireFormat.WIRETYPE_FIXED32:
@@ -3304,26 +3314,6 @@ public abstract class CodedInputStream {
           }
         default:
           throw InvalidProtocolBufferException.invalidWireType();
-      }
-    }
-
-    @Override
-    public void skipMessage() throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag)) {
-          return;
-        }
-      }
-    }
-
-    @Override
-    public void skipMessage(CodedOutputStream output) throws IOException {
-      while (true) {
-        final int tag = readTag();
-        if (tag == 0 || !skipField(tag, output)) {
-          return;
-        }
       }
     }
 
@@ -3426,10 +3416,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
     }
 
     @Override
@@ -3439,10 +3429,10 @@ public abstract class CodedInputStream {
         final ExtensionRegistryLite extensionRegistry)
         throws IOException {
       checkRecursionLimit();
-      ++recursionDepth;
+      ++groupDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(WireFormat.makeTag(fieldNumber, WireFormat.WIRETYPE_END_GROUP));
-      --recursionDepth;
+      --groupDepth;
       return result;
     }
 
@@ -3460,10 +3450,10 @@ public abstract class CodedInputStream {
       final int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       builder.mergeFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
@@ -3476,10 +3466,10 @@ public abstract class CodedInputStream {
       int length = readRawVarint32();
       checkRecursionLimit();
       final int oldLimit = pushLimit(length);
-      ++recursionDepth;
+      ++messageDepth;
       T result = parser.parsePartialFrom(this, extensionRegistry);
       checkLastTagWas(0);
-      --recursionDepth;
+      --messageDepth;
       if (getBytesUntilLimit() != 0) {
         throw InvalidProtocolBufferException.truncatedMessage();
       }
