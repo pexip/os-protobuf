@@ -234,10 +234,10 @@ override_dh_installdocs-indep:
 	dh_installdocs -Xprotobuf-mode.el  # in protobuf-mode-el
 
 execute_after_dh_link-indep:
-	jh_installlibs
-	jh_classpath
-	jh_manifest
-	jh_depends
+	#jh_installlibs
+	#jh_classpath
+	#jh_manifest
+	#jh_depends
 
 override_dh_gencontrol:
 	dh_gencontrol -- -Vpb:API=${API_VERSION}
