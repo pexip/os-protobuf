@@ -3,15 +3,15 @@ Description: fix C++ build tests
 Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Bug-Debian: https://bugs.debian.org/1033998
 Forwarded: no
-Last-Update: 2023-04-07
+Last-Update: 2023-12-26
 
 ---
 
---- protobuf-3.21.12.orig/src/google/protobuf/any_test.cc
-+++ protobuf-3.21.12/src/google/protobuf/any_test.cc
-@@ -62,9 +62,14 @@ TEST(AnyTest, TestPackAndUnpack) {
- 
- TEST(AnyTest, TestPackFromSerializationExceedsSizeLimit) {
+--- a/src/google/protobuf/any_test.cc
++++ b/src/google/protobuf/any_test.cc
+@@ -44,9 +44,14 @@ TEST(AnyTest, TestPackFromSerializationE
+   GTEST_SKIP() << "This toolchain can't allocate that much memory.";
+ #endif
    protobuf_unittest::TestAny submessage;
 -  submessage.mutable_text()->resize(INT_MAX, 'a');
    protobuf_unittest::TestAny message;
@@ -26,9 +26,9 @@ Last-Update: 2023-04-07
  }
  
  TEST(AnyTest, TestUnpackWithTypeMismatch) {
---- protobuf-3.21.12.orig/src/google/protobuf/arena_unittest.cc
-+++ protobuf-3.21.12/src/google/protobuf/arena_unittest.cc
-@@ -1375,11 +1375,11 @@ TEST(ArenaTest, SpaceAllocated_and_Used)
+--- a/src/google/protobuf/arena_unittest.cc
++++ b/src/google/protobuf/arena_unittest.cc
+@@ -1369,11 +1369,11 @@ TEST(ArenaTest, SpaceAllocated_and_Used)
    options.initial_block_size = arena_block.size();
    Arena arena_2(options);
    EXPECT_EQ(1024, arena_2.SpaceAllocated());
@@ -42,7 +42,7 @@ Last-Update: 2023-04-07
    EXPECT_EQ(1024, arena_2.Reset());
  }
  
-@@ -1418,11 +1418,11 @@ TEST(ArenaTest, BlockSizeSmallerThanAllo
+@@ -1437,11 +1437,11 @@ TEST(ArenaTest, BlockSizeSmallerThanAllo
  
      *Arena::Create<int64_t>(&arena) = 42;
      EXPECT_GE(arena.SpaceAllocated(), 8);

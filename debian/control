@@ -3,12 +3,13 @@ Section: devel
 Priority: optional
 Maintainer: Pexip AS <packaging@pexip.com>
 XSBC-Pexip-Original-Maintainer: Laszlo Boszormenyi (GCS) <gcs@debian.org>
-Build-Depends:
+Build-Depends: dpkg-dev (>= 1.22.5),
 # Debian build system
    debhelper-compat (= 13)
- , dh-elpa [amd64 arm64 armel armhf i386 mips64el mipsel ppc64el s390x hppa ppc64 riscv64 sh4 sparc64 x32]
 # C/C++
+ , cmake
  , zlib1g-dev
+ , libabsl-dev (>= 20230802.1)
  , libgmock-dev <!nocheck>
  , libgtest-dev <!nocheck>
 # Python
@@ -16,7 +17,7 @@ Build-Depends:
  , python3-all:any <!nopython>
  , libpython3-all-dev <!nopython>
  , python3-setuptools <!nopython>
- , python3-six <!nopython>
+ , python3-numpy <!nopython> <!nocheck>
 # Manpage generator
  , xmlto
 # Tests
@@ -24,16 +25,18 @@ Build-Depends:
 # Ruby
  , rake-compiler <!noruby>
  , gem2deb <!noruby>
-# PHP
- , pkg-php-tools (>= 1.7~)
 Build-Depends-Indep:
+   dh-sequence-elpa
 # Java
-   ant
+ , ant
  , default-jdk
+ , javahelper
  , maven-repo-helper
  , libguava-java
  , libgoogle-gson-java
-Standards-Version: 4.6.1
+# PHP
+ , pkg-php-tools
+Standards-Version: 4.6.2
 Rules-Requires-Root: no
 Homepage: https://github.com/google/protobuf/
 XS-Ruby-Versions: all
@@ -64,7 +67,7 @@ Description: Protocol Buffers
  build process in this directory only installs the extension; you need to
  install protoc as well to have Ruby code generation functionality.
 
-Package: libprotobuf32
+Package: libprotobuf31
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -84,7 +87,7 @@ Description: protocol buffers C++ library
  .
  This package contains the runtime library needed for C++ applications.
 
-Package: libprotobuf-lite32
+Package: libprotobuf-lite31
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -108,8 +111,8 @@ Package: libprotobuf-dev
 Architecture: any
 Multi-Arch: same
 Section: libdevel
-Depends: ${misc:Depends}, zlib1g-dev,
- libprotobuf32 (= ${binary:Version}), libprotobuf-lite32 (= ${binary:Version})
+Depends: ${misc:Depends}, zlib1g-dev, libabsl-dev (>= 20230802.1),
+ libprotobuf31 (= ${binary:Version}), libprotobuf-lite31 (= ${binary:Version})
 Breaks: protobuf-compiler (<< ${binary:Version}), protobuf-compiler (>> ${binary:Version})
 Provides: protobuf-api-${pb:API}
 Description: protocol buffers C++ library (development files) and proto files
@@ -127,7 +130,7 @@ Description: protocol buffers C++ library (development files) and proto files
  This package contains the development headers and static libraries needed for
  writing C++ applications. Includes well known proto type files.
 
-Package: libprotoc32
+Package: libprotoc31
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -152,7 +155,7 @@ Architecture: any
 Multi-Arch: same
 Section: libdevel
 Depends: ${misc:Depends},
- libprotoc32 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
+ libprotoc31 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
 Replaces: libprotobuf-dev (<< 2.1.0)
 Breaks: libprotobuf-dev (<< 2.1.0)
 Description: protocol buffers compiler library (development files)
@@ -173,7 +176,7 @@ Description: protocol buffers compiler library (development files)
 Package: protobuf-compiler
 Architecture: any
 Multi-Arch: foreign
-Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc32 (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc31 (= ${binary:Version})
 Recommends: libprotobuf-dev
 Suggests: protobuf-mode-el
 Description: compiler for protocol buffer definition files
@@ -218,7 +221,7 @@ Description: Python 3 bindings for protocol buffers
 Package: libprotobuf-java
 Architecture: all
 Multi-Arch: foreign
-Depends: ${misc:Depends}
+Depends: ${java:Depends}, ${misc:Depends}
 Section: java
 Description: Java bindings for protocol buffers
  Protocol buffers are a flexible, efficient, automated mechanism for

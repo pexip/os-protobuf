@@ -1,0 +1,10 @@
+--- a/java/util/pom.xml
++++ b/java/util/pom.xml
+@@ -50,6 +50,7 @@
+     <dependency>
+       <groupId>junit</groupId>
+       <artifactId>junit</artifactId>
++      <scope>test</scope>
+     </dependency>
+     <dependency>
+       <groupId>org.mockito</groupId>
