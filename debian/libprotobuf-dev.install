@@ -3,7 +3,10 @@ usr/lib/${DEB_HOST_MULTIARCH}/libprotobuf-lite.a
 usr/lib/${DEB_HOST_MULTIARCH}/libprotobuf.so
 usr/lib/${DEB_HOST_MULTIARCH}/libprotobuf-lite.so
 usr/lib/${DEB_HOST_MULTIARCH}/libutf8_range.a
+usr/lib/${DEB_HOST_MULTIARCH}/libutf8_range.so
 usr/lib/${DEB_HOST_MULTIARCH}/libutf8_validity.a
+usr/lib/${DEB_HOST_MULTIARCH}/libutf8_validity.so
+usr/lib/${DEB_HOST_MULTIARCH}/libupb.a
 usr/lib/${DEB_HOST_MULTIARCH}/pkgconfig/*
 usr/lib/${DEB_HOST_MULTIARCH}/cmake/*
 usr/include

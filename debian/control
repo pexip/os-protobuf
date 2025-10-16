@@ -28,12 +28,12 @@ Build-Depends: dpkg-dev (>= 1.22.5),
 Build-Depends-Indep:
    dh-sequence-elpa
 # Java
- , ant
- , default-jdk
- , javahelper
- , maven-repo-helper
- , libguava-java
- , libgoogle-gson-java
+# , ant
+# , default-jdk
+# , javahelper
+# , maven-repo-helper
+# , libguava-java
+# , libgoogle-gson-java
 # PHP
  , pkg-php-tools
 Standards-Version: 4.6.2
@@ -42,30 +42,30 @@ Homepage: https://github.com/google/protobuf/
 XS-Ruby-Versions: all
 XS-Pexip-Upstream: http://deb.debian.org/debian/ experimental
 
-Package: ruby-google-protobuf
-Architecture: any
-Multi-Arch: same
-Build-Profiles: <!noruby>
-Section: ruby
-X-Dhruby-Root: ruby
-XB-Ruby-Versions: ${ruby:Versions}
-Depends: ruby,
-         ${ruby:Depends},
-         ${misc:Depends},
-         ${shlibs:Depends}
-Conflicts: ruby-google-protobuf (<< 3.6.0~)
-Replaces: ruby-google-protobuf (<< 3.6.0~)
-Description: Protocol Buffers
- Protocol Buffers are Google's data interchange format.
- .
- This library contains the Ruby extension that implements Protocol Buffers
- functionality in Ruby.
- .
- The Ruby extension makes use of generated Ruby code that defines message and
- enum types in a Ruby DSL. You may write definitions in this DSL directly, but
- we recommend using protoc's Ruby generation support with .proto files. The
- build process in this directory only installs the extension; you need to
- install protoc as well to have Ruby code generation functionality.
+#Package: ruby-google-protobuf
+#Architecture: any
+#Multi-Arch: same
+#Build-Profiles: <!noruby>
+#Section: ruby
+#X-Dhruby-Root: ruby
+#XB-Ruby-Versions: ${ruby:Versions}
+#Depends: ruby,
+#         ${ruby:Depends},
+#         ${misc:Depends},
+#         ${shlibs:Depends}
+#Conflicts: ruby-google-protobuf (<< 3.6.0~)
+#Replaces: ruby-google-protobuf (<< 3.6.0~)
+#Description: Protocol Buffers
+# Protocol Buffers are Google's data interchange format.
+# .
+# This library contains the Ruby extension that implements Protocol Buffers
+# functionality in Ruby.
+# .
+# The Ruby extension makes use of generated Ruby code that defines message and
+# enum types in a Ruby DSL. You may write definitions in this DSL directly, but
+# we recommend using protoc's Ruby generation support with .proto files. The
+# build process in this directory only installs the extension; you need to
+# install protoc as well to have Ruby code generation functionality.
 
 Package: libprotobuf31
 Architecture: any
@@ -218,27 +218,27 @@ Description: Python 3 bindings for protocol buffers
  definition to Python classes, and then the modules in this package will allow
  you to use those classes in your programs.
 
-Package: libprotobuf-java
-Architecture: all
-Multi-Arch: foreign
-Depends: ${java:Depends}, ${misc:Depends}
-Section: java
-Description: Java bindings for protocol buffers
- Protocol buffers are a flexible, efficient, automated mechanism for
- serializing structured data - similar to XML, but smaller, faster, and
- simpler. You define how you want your data to be structured once, then you can
- use special generated source code to easily write and read your structured
- data to and from a variety of data streams and using a variety of languages.
- You can even update your data structure without breaking deployed programs
- that are compiled against the "old" format.
- .
- Google uses Protocol Buffers for almost all of its internal RPC protocols and
- file formats.
- .
- This package contains the Java bindings for the protocol buffers. You will
- need the protoc tool (in the protobuf-compiler package) to compile your
- definition to Java classes, and then the modules in this package will allow
- you to use those classes in your programs.
+#Package: libprotobuf-java
+#Architecture: all
+#Multi-Arch: foreign
+#Depends: ${java:Depends}, ${misc:Depends}
+#Section: java
+#Description: Java bindings for protocol buffers
+# Protocol buffers are a flexible, efficient, automated mechanism for
+# serializing structured data - similar to XML, but smaller, faster, and
+# simpler. You define how you want your data to be structured once, then you can
+# use special generated source code to easily write and read your structured
+# data to and from a variety of data streams and using a variety of languages.
+# You can even update your data structure without breaking deployed programs
+# that are compiled against the "old" format.
+# .
+# Google uses Protocol Buffers for almost all of its internal RPC protocols and
+# file formats.
+# .
+# This package contains the Java bindings for the protocol buffers. You will
+# need the protoc tool (in the protobuf-compiler package) to compile your
+# definition to Java classes, and then the modules in this package will allow
+# you to use those classes in your programs.
 
 Package: elpa-protobuf-mode
 Architecture: all
