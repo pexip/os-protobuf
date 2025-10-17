@@ -9,7 +9,7 @@ Build-Depends: dpkg-dev (>= 1.22.5),
 # C/C++
  , cmake
  , zlib1g-dev
- , libabsl-dev (>= 20230802.1)
+ , libabsl-dev (>= 20250512.1)
  , libgmock-dev <!nocheck>
  , libgtest-dev <!nocheck>
 # Python
