@@ -57,7 +57,7 @@ override_dh_auto_configure:
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 	# build for the native (i.e. build) architecture, as we need
 	# the protoc compiler for the native arch.
-	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=ON -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF
+	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=ON -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_BUILD_LIBUPB=OFF
 
 PYTHON_CROSS_VARS += PROTOC=$(CURDIR)/debian/run_protoc
 PYTHON_CROSS_VARS += PYTHONPATH=/usr/lib/python$$pv/plat-$(DEB_HOST_MULTIARCH)
@@ -65,8 +65,8 @@ PYTHON_CROSS_VARS += _PYTHON_HOST_PLATFORM=$(DEB_HOST_ARCH_OS)-$(DEB_HOST_GNU_CP
 PYTHON_CROSS_VARS += CC=$(CXX)
 PYTHON_CROSS_VARS += CXX=$(CXX)
 else
-	dh_auto_configure --builddir=build-static/ -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
-	dh_auto_configure --builddir=build-shared/ -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=ON  -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
+	dh_auto_configure --builddir=build-static/ -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON -Dprotobuf_BUILD_LIBUPB=OFF
+	dh_auto_configure --builddir=build-shared/ -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=ON  -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON -Dprotobuf_BUILD_LIBUPB=OFF
 endif
 
 override_dh_auto_build-arch:
