@@ -50,10 +50,6 @@ endif
 	find $(CURDIR) -name Makefile -delete
 
 override_dh_auto_configure:
-	# Prepare a clean copy of the source
-	mkdir protobuf-source/
-	cp -a src/google protobuf-source/
-
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 	# build for the native (i.e. build) architecture, as we need
 	# the protoc compiler for the native arch.
@@ -147,7 +143,6 @@ endif
 	$(RM) -r ruby/ext/google/protobuf_c/third_party/utf8_range/
 	find $(CURDIR) -name Makefile -delete
 	$(RM) -f python/setup.py
-	$(RM) -fr protobuf-source/
 
 override_dh_auto_test-arch:
 	dh_auto_test --builddir=build-shared/ --arch
