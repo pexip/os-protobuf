@@ -91,6 +91,10 @@ endif
 
 ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 build
+	# Build the pb2 files before running setup
+	for proto in any api compiler/plugin descriptor duration empty field_mask source_context struct timestamp type wrappers; do \
+		build-static/protoc -I src --python_out=python/ src/google/protobuf/$${proto}.proto; \
+	done
 #	cp -rv python python3
 #	export LDFLAGS=-L$(CURDIR)/build-shared/;
 	cp python/dist/setup.py python/
