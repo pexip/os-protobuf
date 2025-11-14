@@ -108,7 +108,7 @@ ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 		editions/internal_defaults_escape.cc \
 		-I$(CURDIR)/src \
 		-Lbuild-shared -lprotobuf \
-		$(shell pkg-config --libs absl_strings absl_log_internal_nullguard absl_absl_log absl_flags_parse absl_flags)
+		$(shell pkg-config --libs absl_strings absl_log_internal_check_op absl_log_internal_nullguard absl_absl_log absl_flags_parse absl_flags)
 
 	# Generate the template
 	LD_LIBRARY_PATH=$(CURDIR)/build-shared editions/internal_defaults_escape \
