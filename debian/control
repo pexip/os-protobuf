@@ -42,7 +42,7 @@ Rules-Requires-Root: no
 Homepage: https://github.com/google/protobuf/
 XS-Ruby-Versions: all
 XS-Pexip-Upstream: http://deb.debian.org/debian/ experimental
-X-Pexip-Note: The protobuf package is heavily modified.  PexOS requires
+XS-Pexip-Note: The protobuf package is heavily modified.  PexOS requires
  a newer version of protobuf than in Debian Trixie (for dependency
  purposes).  A new version is therefore pulled directly from upstream;
  this accounts for the changes to patches.  PexOS also avoids
