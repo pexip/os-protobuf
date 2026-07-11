@@ -8,10 +8,13 @@
 #ifndef GOOGLE_PROTOBUF_MICRO_STRING_H__
 #define GOOGLE_PROTOBUF_MICRO_STRING_H__
 
+#include <cstddef>
 #include <cstdint>
+#include <type_traits>
 
 #include "absl/base/config.h"
 #include "absl/log/absl_check.h"
+#include "absl/strings/cord.h"
 #include "absl/strings/string_view.h"
 #include "google/protobuf/arena.h"
 
@@ -74,7 +77,7 @@ class PROTOBUF_EXPORT MicroString {
 
     absl::string_view view() const { return {payload, size}; }
     char* owned_head() {
-      ABSL_DCHECK_GE(capacity, kOwned);
+      ABSL_DCHECK_GE(capacity, (unsigned)kOwned);
       return reinterpret_cast<char*>(this + 1);
     }
 
@@ -97,12 +100,34 @@ class PROTOBUF_EXPORT MicroString {
     }
   };
 
+  struct MicroRep {
+    uint8_t size;
+    uint8_t capacity;
+
+    char* data() { return reinterpret_cast<char*>(this + 1); }
+    const char* data() const { return reinterpret_cast<const char*>(this + 1); }
+    absl::string_view view() const { return {data(), size}; }
+
+    void SetInitialSize(uint8_t size) {
+      PoisonMemoryRegion(data() + size, capacity - size);
+      this->size = size;
+    }
+
+    void Unpoison() { UnpoisonMemoryRegion(data(), capacity); }
+
+    void ChangeSize(uint8_t new_size) {
+      PoisonMemoryRegion(data() + new_size, capacity - new_size);
+      UnpoisonMemoryRegion(data(), new_size);
+      size = new_size;
+    }
+  };
+
  public:
   // We don't allow extra capacity in big-endian because it is harder to manage
   // the pointer to the MicroString "base".
   static constexpr bool kAllowExtraCapacity = IsLittleEndian();
   static constexpr size_t kInlineCapacity = sizeof(uintptr_t) - 1;
-  static constexpr size_t kMaxMicroRepCapacity = 255;
+  static constexpr size_t kMaxMicroRepCapacity = 256 - sizeof(MicroRep);
 
   // Empty string.
   constexpr MicroString() : rep_() {}
@@ -121,13 +146,23 @@ class PROTOBUF_EXPORT MicroString {
   union UnownedPayload {
     LargeRep payload;
     // We use a union to be able to get an unaligned pointer for the
-    // payload in the constexpr contructor. `for_tag + kIsLargeRepTag` is
+    // payload in the constexpr constructor. `for_tag + kIsLargeRepTag` is
     // equivalent to `reinterpret_cast<uintptr_t>(&payload) | kIsLargeRepTag`
     // but works during constant evaluation.
     char for_tag[1];
+
+    // To match the LazyString API.
+    auto get() const { return payload.view(); }
   };
-  explicit constexpr MicroString(const UnownedPayload& unowned_input)
+  constexpr MicroString(const UnownedPayload& unowned_input)  // NOLINT
       : rep_(const_cast<char*>(unowned_input.for_tag + kIsLargeRepTag)) {}
+
+  // Like the constructor above, but for DynamicMessage where we don't have a
+  // generated UnownedPayload to pass.
+  // The instance created has to be destroyed with
+  // `DestroyDefaultValuePrototype`.
+  static MicroString MakeDefaultValuePrototype(absl::string_view default_value);
+  void DestroyDefaultValuePrototype();
 
   // Resets value to the default constructor state.
   // Disregards initial value of rep_ (so this is the *ONLY* safe method to call
@@ -171,6 +206,14 @@ class PROTOBUF_EXPORT MicroString {
   void Set(absl::string_view data, Arena* arena) {
     SetMaybeConstant(*this, data, arena);
   }
+
+  void Set(const absl::Cord& value, Arena* arena) {
+    SetInChunks(value.size(), arena, [&value](auto append) {
+      for (absl::string_view chunk : value.Chunks()) {
+        append(chunk);
+      }
+    });
+  }
   void Set(absl::string_view data, Arena* arena, size_t inline_capacity) {
     SetImpl(data, arena, inline_capacity);
   }
@@ -198,6 +241,16 @@ class PROTOBUF_EXPORT MicroString {
   // Set the payload to `unowned`. Will not allocate memory, but might free
   // memory if already set.
   void SetUnowned(const UnownedPayload& unowned_input, Arena* arena);
+
+  // To match the API of ArenaStringPtr.
+  // It resets the value to the passed default, trying to keep preexisting
+  // buffer if we are on an arena. This reduces arena bloat when reusing a
+  // message.
+  void ClearToDefault(const UnownedPayload& unowned_input, Arena* arena);
+
+  // Like above, but takes a prototype `MicroString` that has the unowned rep.
+  // Used for reflection that does not have access to the `UnownedPayload`.
+  void ClearToDefault(const MicroString& other, Arena* arena);
 
   // Set the string, but the input comes in individual chunks.
   // This function is designed to be called from the parser.
@@ -291,27 +344,6 @@ class PROTOBUF_EXPORT MicroString {
     return cap >= kOwned ? kOwned : static_cast<LargeRepKind>(cap);
   }
 
-  struct MicroRep {
-    uint8_t size;
-    uint8_t capacity;
-
-    char* data() { return reinterpret_cast<char*>(this + 1); }
-    const char* data() const { return reinterpret_cast<const char*>(this + 1); }
-    absl::string_view view() const { return {data(), size}; }
-
-    void SetInitialSize(uint8_t size) {
-      PoisonMemoryRegion(data() + size, capacity - size);
-      this->size = size;
-    }
-
-    void Unpoison() { UnpoisonMemoryRegion(data(), capacity); }
-
-    void ChangeSize(uint8_t new_size) {
-      PoisonMemoryRegion(data() + new_size, capacity - new_size);
-      UnpoisonMemoryRegion(data(), new_size);
-      size = new_size;
-    }
-  };
   // Micro-optimization: by using kIsMicroRepTag as 2, the MicroRep `rep_`
   // pointer (with the tag) is already pointing into the data buffer.
   static_assert(sizeof(MicroRep) == kIsMicroRepTag);
@@ -470,12 +502,14 @@ void MicroString::SetInChunks(size_t size, Arena* arena, F setter,
   };
 
   const auto do_micro = [&](MicroRep* r) {
-    ABSL_DCHECK_LE(size, r->capacity);
-    r->ChangeSize(invoke_setter(r->data()));
+    ABSL_DCHECK_LE(size, static_cast<size_t>(r->capacity));
+    r->Unpoison();
+    r->ChangeSize(static_cast<uint8_t>(invoke_setter(r->data())));
   };
 
   const auto do_owned = [&](LargeRep* r) {
     ABSL_DCHECK_LE(size, r->capacity);
+    r->Unpoison();
     r->ChangeSize(invoke_setter(r->owned_head()));
   };
 
@@ -509,10 +543,6 @@ void MicroString::SetInChunks(size_t size, Arena* arena, F setter,
         break;
     }
   }
-
-  // Copied from ParseContext as an acceptable size that we can preallocate
-  // without verifying.
-  static constexpr size_t kSafeStringSize = 50000000;
 
   // We didn't have space for it, so allocate the space and dispatch.
   if (arena == nullptr) Destroy();
@@ -556,12 +586,24 @@ class MicroStringExtraImpl : private MicroString {
   static_assert(kInlineCapacity < MicroString::kMaxInlineCapacity,
                 "Must fit with the tags.");
 
+#if defined(__cpp_lib_is_constant_evaluated)
   constexpr MicroStringExtraImpl() {
     // Some compilers don't like to assert kAllowExtraCapacity directly, so make
     // the expression dependent.
     static_assert(static_cast<int>(RequestedSpace != 0) &
                   static_cast<int>(MicroString::kAllowExtraCapacity));
+
+    if (std::is_constant_evaluated()) {
+      std::fill(std::begin(extra_buffer_), std::end(extra_buffer_), 0);
+    }
   }
+#else   // __cpp_lib_is_constant_evaluated
+  // For C++17. We always initialize the bytes.
+  constexpr MicroStringExtraImpl() : extra_buffer_{} {}
+#endif  // __cpp_lib_is_constant_evaluated
+
+  explicit MicroStringExtraImpl(Arena*) : MicroStringExtraImpl() {}
+
   MicroStringExtraImpl(Arena* arena, const MicroStringExtraImpl& other)
       : MicroString(FromOtherTag{}, other, arena) {}
 
@@ -597,6 +639,7 @@ class MicroStringExtraImpl : private MicroString {
     MicroString::InternalSwap(other, kInlineCapacity);
   }
 
+  using MicroString::Clear;
   using MicroString::SpaceUsedExcludingSelfLong;
 
  private:

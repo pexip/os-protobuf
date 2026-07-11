@@ -8,7 +8,8 @@ Build-Depends: dpkg-dev (>= 1.22.5),
 # C/C++
  , cmake
  , zlib1g-dev
- , libabsl-dev (>= 20230802.1)
+ , libabsl-dev (>= 20260107.0)
+ , libutf8-range-dev
  , libgmock-dev <!nocheck>
  , libgtest-dev <!nocheck>
 # Python
@@ -22,6 +23,7 @@ Build-Depends: dpkg-dev (>= 1.22.5),
 # Tests
  , unzip <!nocheck>
 # Ruby
+ , rake <!noruby>
  , rake-compiler <!noruby>
  , gem2deb <!noruby>
 Build-Depends-Indep:
@@ -35,9 +37,8 @@ Build-Depends-Indep:
  , libgoogle-gson-java
 # PHP
  , pkg-php-tools
-Standards-Version: 4.6.2
-Rules-Requires-Root: no
-Homepage: https://github.com/google/protobuf/
+Standards-Version: 4.7.2
+Homepage: https://github.com/protocolbuffers/protobuf
 XS-Ruby-Versions: all
 
 Package: ruby-google-protobuf
@@ -65,7 +66,7 @@ Description: Protocol Buffers
  build process in this directory only installs the extension; you need to
  install protoc as well to have Ruby code generation functionality.
 
-Package: libprotobuf25
+Package: libprotobuf36
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -85,7 +86,7 @@ Description: protocol buffers C++ library
  .
  This package contains the runtime library needed for C++ applications.
 
-Package: libprotobuf-lite25
+Package: libprotobuf-lite36
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -110,7 +111,7 @@ Architecture: any
 Multi-Arch: same
 Section: libdevel
 Depends: ${misc:Depends}, zlib1g-dev, libabsl-dev (>= 20230802.1),
- libprotobuf25 (= ${binary:Version}), libprotobuf-lite25 (= ${binary:Version})
+ libprotobuf36 (= ${binary:Version}), libprotobuf-lite36 (= ${binary:Version})
 Breaks: protobuf-compiler (<< ${binary:Version}), protobuf-compiler (>> ${binary:Version})
 Provides: protobuf-api-${pb:API}
 Description: protocol buffers C++ library (development files) and proto files
@@ -128,7 +129,7 @@ Description: protocol buffers C++ library (development files) and proto files
  This package contains the development headers and static libraries needed for
  writing C++ applications. Includes well known proto type files.
 
-Package: libprotoc25
+Package: libprotoc36
 Architecture: any
 Multi-Arch: same
 Section: libs
@@ -153,7 +154,7 @@ Architecture: any
 Multi-Arch: same
 Section: libdevel
 Depends: ${misc:Depends},
- libprotoc25 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
+ libprotoc36 (= ${binary:Version}), libprotobuf-dev (= ${binary:Version})
 Replaces: libprotobuf-dev (<< 2.1.0)
 Breaks: libprotobuf-dev (<< 2.1.0)
 Description: protocol buffers compiler library (development files)
@@ -174,7 +175,7 @@ Description: protocol buffers compiler library (development files)
 Package: protobuf-compiler
 Architecture: any
 Multi-Arch: foreign
-Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc25 (= ${binary:Version})
+Depends: ${shlibs:Depends}, ${misc:Depends}, libprotoc36 (= ${binary:Version})
 Recommends: libprotobuf-dev
 Suggests: protobuf-mode-el
 Description: compiler for protocol buffer definition files

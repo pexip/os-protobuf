@@ -1,0 +1,44 @@
+Index: protobuf-3.35.0/ruby/Rakefile
+===================================================================
+--- protobuf-3.35.0.orig/ruby/Rakefile
++++ protobuf-3.35.0/ruby/Rakefile
+@@ -5,6 +5,7 @@ require "rake/testtask"
+ import 'lib/google/tasks/ffi.rake'
+ 
+ spec = Gem::Specification.load("google-protobuf.gemspec")
++puts "DEBUG GEM SPEC IS: #{spec.inspect}"
+ 
+ well_known_protos = %w[
+   google/protobuf/any.proto
+@@ -210,7 +211,7 @@ task :generate_stubs do
+   load './generate_stubs.rb'
+ end
+ 
+-task :build => [:clean, :genproto, :copy_third_party, :compile, :generate_stubs, :"ffi-protobuf:default"]
++task :build => [:genproto, :copy_third_party, :compile, :generate_stubs, :"ffi-protobuf:default"]
+ Rake::Task[:gem].enhance [:copy_third_party, :genproto]
+ task :default => [:build]
+ 
+Index: protobuf-3.35.0/ruby/google-protobuf.gemspec
+===================================================================
+--- protobuf-3.35.0.orig/ruby/google-protobuf.gemspec
++++ protobuf-3.35.0/ruby/google-protobuf.gemspec
+@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
+   s.authors     = ["Protobuf Authors"]
+   s.email       = "protobuf@googlegroups.com"
+   s.metadata    = { "source_code_uri" => "https://github.com/protocolbuffers/protobuf/tree/#{git_tag}/ruby" }
+-  s.require_paths = ["lib"]
++  s.require_paths = ["lib", "tests"]
+   s.files       = Dir.glob('lib/**/*.{rb,rake}')
+   if RUBY_PLATFORM == "java"
+     s.platform  = "java"
+@@ -38,6 +38,9 @@ Gem::Specification.new do |s|
+       "ext/google/protobuf_c/Rakefile"
+     ]
+   end
++  s.files += ["google-protobuf.gemspec"]
++  s.files += Dir.glob('tests/**/*')
++  s.files += ["generate_stubs.rb"]
+   s.required_ruby_version = '>= 3.2'
+   # bigdecimal must be used as a non-built in gem as of ruby-3.4
+   s.add_dependency "bigdecimal"

@@ -57,10 +57,10 @@ class iterator_range {
   // Users who need to know the "size" of a non-random-access iterator_range
   // should pass the range to `absl::c_distance()` instead.
   template <class It = IteratorT>
-  typename std::enable_if<std::is_base_of<std::random_access_iterator_tag,
-                                          typename std::iterator_traits<
-                                              It>::iterator_category>::value,
-                          size_t>::type
+  std::enable_if_t<
+      std::is_base_of_v<std::random_access_iterator_tag,
+                        typename std::iterator_traits<It>::iterator_category>,
+      size_t>
   size() const {
     return std::distance(begin_iterator_, end_iterator_);
   }
@@ -72,8 +72,6 @@ class iterator_range {
   IteratorT begin_iterator_, end_iterator_;
 };
 
-#ifdef __cpp_if_constexpr
-
 
 template <bool is_oneof>
 struct DynamicFieldInfoHelper {
@@ -81,19 +79,15 @@ struct DynamicFieldInfoHelper {
   static T Get(const Reflection* reflection, const Message& message,
                const FieldDescriptor* field) {
     if constexpr (is_oneof) {
-      return reflection->GetRaw<T>(message, field);
-    } else {
-      return reflection->GetRawNonOneof<T>(message, field);
     }
+    return reflection->GetRaw<T>(message, field);
   }
   template <typename T>
   static T& GetRef(const Reflection* reflection, const Message& message,
                    const FieldDescriptor* field) {
     if constexpr (is_oneof) {
-      return reflection->GetRaw<T>(message, field);
-    } else {
-      return reflection->GetRawNonOneof<T>(message, field);
     }
+    return reflection->GetRaw<T>(message, field);
   }
   template <typename T>
   static T& Mutable(const Reflection* reflection, Message& message,
@@ -101,7 +95,7 @@ struct DynamicFieldInfoHelper {
     if constexpr (is_oneof) {
       return *reflection->MutableRaw<T>(&message, field);
     } else {
-      return *reflection->MutableRawNonOneof<T>(&message, field);
+      return *reflection->MutableRaw<T>(&message, field);
     }
   }
 
@@ -145,7 +139,7 @@ struct DynamicExtensionInfoHelper {
   PROTOBUF_SINGULAR_PRIMITIVE_METHOD(Float, float, float);
   PROTOBUF_SINGULAR_PRIMITIVE_METHOD(Double, double, double);
   PROTOBUF_SINGULAR_PRIMITIVE_METHOD(Bool, bool, bool);
-  PROTOBUF_SINGULAR_PRIMITIVE_METHOD(Enum, int, enum);
+  PROTOBUF_SINGULAR_PRIMITIVE_METHOD(Enum, int, int32_t);
 
 #undef PROTOBUF_SINGULAR_PRIMITIVE_METHOD
 
@@ -168,7 +162,7 @@ struct DynamicExtensionInfoHelper {
   PROTOBUF_REPEATED_FIELD_METHODS(Float, float, float);
   PROTOBUF_REPEATED_FIELD_METHODS(Double, double, double);
   PROTOBUF_REPEATED_FIELD_METHODS(Bool, bool, bool);
-  PROTOBUF_REPEATED_FIELD_METHODS(Enum, int, enum);
+  PROTOBUF_REPEATED_FIELD_METHODS(Enum, int, int32_t);
 
 #undef PROTOBUF_REPEATED_FIELD_METHODS
 
@@ -211,29 +205,6 @@ struct DynamicExtensionInfoHelper {
     ext.ptr.message_value->Clear();
   }
 
-  static const Message& GetLazyMessage(const Extension& ext,
-                                       const Message& prototype, Arena* arena) {
-    return DownCastMessage<Message>(
-        ext.ptr.lazymessage_value->GetMessage(prototype, arena));
-  }
-  static const Message& GetLazyMessageIgnoreUnparsed(const Extension& ext,
-                                                     const Message& prototype,
-                                                     Arena* arena) {
-    return DownCastMessage<Message>(
-        ext.ptr.lazymessage_value->GetMessageIgnoreUnparsed(prototype, arena));
-  }
-  static Message& MutableLazyMessage(Extension& ext, const Message& prototype,
-                                     Arena* arena) {
-    return DownCastMessage<Message>(
-        *ext.ptr.lazymessage_value->MutableMessage(prototype, arena));
-  }
-  static void ClearLazyMessage(Extension& ext) {
-    ext.is_cleared = true;
-    return ext.ptr.lazymessage_value->Clear();
-  }
-  static size_t ByteSizeLongLazyMessage(const Extension& ext) {
-    return ext.ptr.lazymessage_value->ByteSizeLong();
-  }
 };
 
 ////////////////////////////////////////////////////////////////////////
@@ -656,39 +627,6 @@ struct SingularLazyMessageDynamicExtensionInfo {
   static constexpr bool is_lazy = true;       // NOLINT
 };
 
-template <typename ExtensionT>
-struct LazyMessageDynamicExtensionInfo
-    : SingularLazyMessageDynamicExtensionInfo {
-  LazyMessageDynamicExtensionInfo(ExtensionT& e, int n, bool mset,
-                                  const Message& p, Arena* a)
-      : ext(e), ext_number(n), is_message_set(mset), prototype(p), arena(a) {}
-
-  int number() const { return ext_number; }
-  FieldDescriptor::Type type() const {
-    return static_cast<FieldDescriptor::Type>(ext.type);
-  }
-  const Message& Get() const {
-    return DynamicExtensionInfoHelper::GetLazyMessage(ext, prototype, arena);
-  }
-  const Message& GetIgnoreUnparsed() const {
-    return DynamicExtensionInfoHelper::GetLazyMessageIgnoreUnparsed(
-        ext, prototype, arena);
-  }
-  Message& Mutable() {
-    return DynamicExtensionInfoHelper::MutableLazyMessage(ext, prototype,
-                                                          arena);
-  }
-  void Clear() { DynamicExtensionInfoHelper::ClearLazyMessage(ext); }
-  size_t FieldByteSize() const {
-    return DynamicExtensionInfoHelper::ByteSizeLongLazyMessage(ext);
-  }
-
-  ExtensionT& ext;
-  int ext_number;
-  bool is_message_set;
-  const Message& prototype;
-  Arena* arena;
-};
 
 ////////////////////////////////////////////////////////////////////////
 // Repeated fields
@@ -709,12 +647,17 @@ struct RepeatedEntityDynamicFieldInfoBase {
     return {const_repeated.cbegin(), const_repeated.cend()};
   }
   iterator_range<typename RepeatedField<FieldT>::iterator> Mutable() {
-    auto& rep =
-        *reflection->MutableRepeatedFieldInternal<FieldT>(&message, field);
+    ABSL_DCHECK(!field->is_extension());
+    auto& rep = *reflection->MutableRepeatedFieldInternal<FieldT>(
+        &message, field, Reflection::GetRepeatedFieldIntent::kHiddenOrInternal);
     return {rep.begin(), rep.end()};
   }
   void Clear() {
-    reflection->MutableRepeatedFieldInternal<FieldT>(&message, field)->Clear();
+    reflection
+        ->MutableRepeatedFieldInternal<FieldT>(
+            &message, field,
+            Reflection::GetRepeatedFieldIntent::kHiddenOrInternal)
+        ->Clear();
   }
 
   const Reflection* reflection;
@@ -810,12 +753,16 @@ struct RepeatedPtrEntityDynamicFieldInfoBase {
     return {const_repeated.cbegin(), const_repeated.cend()};
   }
   iterator_range<typename RepeatedPtrField<FieldT>::iterator> Mutable() {
-    auto& rep =
-        *reflection->MutableRepeatedPtrFieldInternal<FieldT>(&message, field);
+    ABSL_DCHECK(!field->is_extension());
+    auto& rep = *reflection->MutableRepeatedPtrFieldInternal<FieldT>(
+        &message, field, Reflection::GetRepeatedFieldIntent::kHiddenOrInternal);
     return {rep.begin(), rep.end()};
   }
   void Clear() {
-    reflection->MutableRepeatedPtrFieldInternal<FieldT>(&message, field)
+    reflection
+        ->MutableRepeatedPtrFieldInternal<FieldT>(
+            &message, field,
+            Reflection::GetRepeatedFieldIntent::kHiddenOrInternal)
         ->Clear();
   }
 
@@ -1381,16 +1328,12 @@ struct MapDynamicFieldInfo {
   template <typename T, typename Callback>
   static void VisitElementsImpl(T& msg, const Reflection*,
                                 const FieldDescriptor* field,
-                                const MapFieldBase& const_map_field,
-                                Callback&& cb, Rank0) {
-    // Unfortunately, we have to const_cast here because MapIterator only takes
-    // a mutable MapFieldBase pointer. This is still safe because value iterator
-    // is not mutable.
-    MapFieldBase* map_field = const_cast<MapFieldBase*>(&const_map_field);
+                                const MapFieldBase& map_field, Callback&& cb,
+                                Rank0) {
     const Descriptor* descriptor = field->message_type();
-    MapIterator begin(map_field, descriptor), end(map_field, descriptor);
-    const_map_field.MapBegin(&begin);
-    const_map_field.MapEnd(&end);
+    ConstMapIterator begin(&map_field, descriptor), end(&map_field, descriptor);
+    map_field.ConstMapBegin(&begin);
+    map_field.ConstMapEnd(&end);
 
     for (auto it = begin; it != end; ++it) {
       MapDynamicFieldVisitKey(it.GetKey(), it.GetValueRef(), cb);
@@ -1409,6 +1352,7 @@ struct MapDynamicFieldInfo {
             reflection, message, field);
 
     map_field.Clear();
+    reflection->ClearHasBit(&message, field);
   }
 
   static constexpr bool is_repeated = true;    // NOLINT
@@ -1424,8 +1368,6 @@ struct MapDynamicFieldInfo {
   const FieldDescriptor* value;
   const MapFieldBase& const_map_field;
 };
-
-#endif  // __cpp_if_constexpr
 
 }  // namespace internal
 }  // namespace protobuf

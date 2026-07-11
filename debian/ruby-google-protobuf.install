@@ -1,1 +1,2 @@
-ruby/lib/google usr/lib/ruby/vendor_ruby
+ruby/lib/google/*.rb usr/lib/ruby/vendor_ruby/
+ruby/lib/google/protobuf/ usr/lib/ruby/vendor_ruby/

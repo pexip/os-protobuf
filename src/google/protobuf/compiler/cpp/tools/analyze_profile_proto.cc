@@ -14,7 +14,6 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -45,13 +44,14 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "absl/types/optional.h"
+#include "third_party/gloop/thread/threadpool.h"
+#include "third_party/gloop/util/status/status_macros.h"
 #include "google/protobuf/compiler/cpp/cpp_access_info_parse_helper.h"
 #include "google/protobuf/compiler/cpp/helpers.h"
 #include "google/protobuf/compiler/cpp/options.h"
 #include "google/protobuf/descriptor.h"
 #include "third_party/re2/re2.h"
-#include "thread/threadpool.h"
-#include "google/protobuf/stubs/status_macros.h"
 
 namespace google {
 namespace protobuf {
@@ -68,7 +68,7 @@ struct PDProtoAnalysis {
   uint64_t presence_count = 0;
   uint64_t usage_count = 0;
   float presence_probability = 0.0;
-  std::optional<AccessInfoMap::ElementStats> element_stats;
+  absl::optional<AccessInfoMap::ElementStats> element_stats;
 };
 
 std::ostream& operator<<(std::ostream& s, PDProtoScale scale) {
@@ -113,6 +113,7 @@ class PDProtoAnalyzer {
         std::make_unique<cpp::CppAccessInfoParseHelper>());
     options_.access_info_map = &info_map_;
     scc_analyzer_ = std::make_unique<cpp::MessageSCCAnalyzer>(options_);
+    options_.scc_analyzer = scc_analyzer_.get();
   }
 
   void SetFile(const FileDescriptor* file) {
@@ -160,11 +161,11 @@ class PDProtoAnalyzer {
   }
 
   PDProtoOptimization OptimizeField(const FieldDescriptor* field) {
-    if (IsFieldInlined(field, options_)) {
+    if (cpp::IsFieldInlined(field, options_)) {
       return PDProtoOptimization::kInline;
     }
-    if (IsLazy(field, options_, scc_analyzer_.get())) {
-      if (IsLazilyVerifiedLazy(field, options_)) {
+    if (cpp::IsLazy(field, options_)) {
+      if (cpp::IsLazilyVerifiedLazy(field, options_)) {
         return PDProtoOptimization::kUnverifiedLazy;
       }
       return PDProtoOptimization::kLazy;
@@ -242,7 +243,9 @@ const Descriptor* FindMessageTypeByCppName(const DescriptorPool& pool,
     min_length = pos + 1;
   }
 
-  ABSL_LOG(WARNING) << "Unknown c++ message name '" << name << "'";
+  if (ABSL_VLOG_IS_ON(1)) {
+    ABSL_LOG(WARNING) << "Unknown C++ message name '" << name << "'";
+  }
   return nullptr;
 }
 
@@ -364,8 +367,6 @@ void Aggregate(const FieldDescriptor* field, const PDProtoAnalysis& analysis,
     }
   }
   if (field->is_repeated() && analysis.element_stats.has_value()) {
-    ABSL_LOG(INFO) << "Repeated field: " << field->full_name()
-                   << " has element stats: " << analysis.element_stats->mean;
     stats.repeated_elem_stats += *analysis.element_stats;
   }
 }
@@ -560,7 +561,7 @@ ParallelRunResults RunInParallel(
   ParallelRunResults results;
   {
     ThreadPool threads{static_cast<int>(std::min(num_runs, num_workers))};
-    threads.StartWorkers();
+
     for (size_t i = 0; i < num_runs; ++i) {
       threads.Schedule([i, num_runs, get_run_id, do_work, &results, &mu]() {
         // Asynchronous section.
@@ -571,7 +572,7 @@ ParallelRunResults RunInParallel(
         const absl::Duration duration = absl::Now() - start;
 
         // Synchronous section.
-        absl::MutexLock lock(&mu);
+        absl::MutexLock lock(mu);
         ++results.num_done;
         ++(status.ok() ? results.num_succeeded : results.num_failed);
         results.status.Update(status);
@@ -619,7 +620,7 @@ absl::Status AnalyzeAndAggregateProfileProtosToText(
                          AnalyzeProfileProto(substream, path, options));
 
         // Synchronous section.
-        absl::MutexLock lock(&mu);
+        absl::MutexLock lock(mu);
         Aggregate(stats, merged_stats);
         if (!options.sort_output_by_file_name) {
           stream << substream.str() << std::endl;

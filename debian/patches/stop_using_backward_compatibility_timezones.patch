@@ -18,10 +18,10 @@ diff --git a/python/google/protobuf/internal/well_known_types_test.py b/python/g
 index 636dae64130..593ec6bfe16 100644
 --- a/python/google/protobuf/internal/well_known_types_test.py
 +++ b/python/google/protobuf/internal/well_known_types_test.py
-@@ -26,12 +26,12 @@ from google.protobuf import unittest_pb2
- try:
+@@ -32,12 +32,12 @@ try:
    # New module in Python 3.9:
    import zoneinfo  # pylint:disable=g-import-not-at-top
+ 
 -  _TZ_JAPAN = zoneinfo.ZoneInfo('Japan')
 -  _TZ_PACIFIC = zoneinfo.ZoneInfo('US/Pacific')
 +  _TZ_JAPAN = zoneinfo.ZoneInfo('Asia/Tokyo')

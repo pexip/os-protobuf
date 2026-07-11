@@ -10,7 +10,7 @@
 
 #include <type_traits>
 
-#include "google/protobuf/hpb/ptr.h"
+#include "hpb/ptr.h"
 
 namespace hpb {
 namespace internal {
@@ -63,7 +63,7 @@ using EnableIfHpbClassThatHasExtensions =
     std::enable_if_t<IsHpbClassThatHasExtensions<T>>;
 
 template <typename T>
-using EnableIfMutableProto = std::enable_if_t<!std::is_const<T>::value>;
+using EnableIfMutableProto = std::enable_if_t<!std::is_const_v<T>>;
 
 template <typename T, typename T2>
 using add_const_if_T_is_const =

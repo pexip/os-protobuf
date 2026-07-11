@@ -126,6 +126,15 @@ public class DynamicMessageTest {
   }
 
   @Test
+  public void testDynamicMessageRepeatedSettersWithEmptyList() throws Exception {
+    Message.Builder builder = DynamicMessage.newBuilder(TestAllTypes.getDescriptor());
+    reflectionTester.setRepeatedFieldsToEmptyListViaReflection(builder);
+    Message message = builder.build();
+    reflectionTester.assertClearViaReflection(message);
+    assertThat(message).isEqualTo(DynamicMessage.getDefaultInstance(TestAllTypes.getDescriptor()));
+  }
+
+  @Test
   public void testDynamicMessageRepeatedSettersRejectNull() throws Exception {
     Message.Builder builder = DynamicMessage.newBuilder(TestAllTypes.getDescriptor());
     reflectionTester.assertReflectionRepeatedSettersRejectNull(builder);
@@ -402,7 +411,7 @@ public class DynamicMessageTest {
         DynamicMessage.newBuilder(TestMessageSet.getDescriptor())
             .setField(
                 TestMessageSetExtension2.messageSetExtension.getDescriptor(),
-                new LazyField(
+                new InternalLazyField(
                     DynamicMessage.getDefaultInstance(TestMessageSetExtension2.getDescriptor()),
                     extensionRegistry,
                     suboptimallySerializedMessageSetExtension))

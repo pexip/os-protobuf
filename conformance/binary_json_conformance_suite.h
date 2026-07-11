@@ -55,9 +55,20 @@ class BinaryAndJsonConformanceSuite : public ConformanceTestSuite {
                             const std::string& input_protobuf,
                             const std::string& equivalent_text_format);
 
+  template <typename MessageType>
+  void ExpectParseFailureForProto(const std::string& proto,
+                                  const std::string& test_name,
+                                  ConformanceLevel level);
+
   void RunDelimitedFieldTests();
 
+  void RunUnstableTests();
+
+  void RunUtf8ValidationTests();
+
   void RunMessageSetTests();
+
+  void RunRecursionLimitTests();
 
   template <typename MessageType>
   friend class BinaryAndJsonConformanceSuiteImpl;
@@ -82,7 +93,6 @@ class BinaryAndJsonConformanceSuiteImpl {
   void RunAllTests();
 
   void RunBinaryPerformanceTests();
-  void RunJsonPerformanceTests();
   void RunJsonTests();
   void RunJsonTestsForStoresDefaultPrimitive();
   void RunJsonTestsForFieldNameConvention();
@@ -95,6 +105,7 @@ class BinaryAndJsonConformanceSuiteImpl {
   void RunJsonTestsForValue();
   void RunJsonTestsForAny();
   void RunJsonTestsForUnknownEnumStringValues();
+  void RunJsonTestsForReservedFields();
   void RunValidJsonTest(const std::string& test_name, ConformanceLevel level,
                         const std::string& input_json,
                         const std::string& equivalent_text_format);
@@ -152,6 +163,7 @@ class BinaryAndJsonConformanceSuiteImpl {
   void TestIllegalTags();
   void TestUnmatchedGroup();
   void TestUnknownWireType();
+  void TestInvalidUtf8String();
   void TestOneofMessage();
   void TestUnknownMessage();
   void TestUnknownOrdering();
@@ -169,8 +181,6 @@ class BinaryAndJsonConformanceSuiteImpl {
       google::protobuf::FieldDescriptor::Type);
   void TestBinaryPerformanceMergeMessageWithUnknownFieldForType(
       google::protobuf::FieldDescriptor::Type);
-  void TestJsonPerformanceMergeMessageWithRepeatedFieldForType(
-      google::protobuf::FieldDescriptor::Type, std::string field_value);
 
   enum class Packed {
     kUnspecified = 0,

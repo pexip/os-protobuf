@@ -17,6 +17,7 @@
 
 #include <functional>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -26,10 +27,15 @@
 #include "google/protobuf/edition_unittest.pb.h"
 #include "google/protobuf/explicitly_constructed.h"
 #include "google/protobuf/generated_message_tctable_decl.h"
+#include "google/protobuf/generated_message_util.h"
 #include "google/protobuf/has_bits.h"
 #include "google/protobuf/internal_visibility.h"
+#include "google/protobuf/message_lite.h"
+#include "google/protobuf/micro_string.h"
+#include "google/protobuf/port.h"
 #include "google/protobuf/test_util.h"
 #include "google/protobuf/unittest_import.pb.h"
+
 
 #define MESSAGE_TEST_NAME EditionMessageTest
 #define MESSAGE_FACTORY_TEST_NAME EditionMessageFactoryTest
@@ -69,7 +75,7 @@ TEST(EditionMessageTest,
   auto* table = GetTableIfAvailable<Proto>(nullptr);
   // Only test when TDP is on, and we have these fields inlined.
   if (table != nullptr &&
-      table->fast_entry(1)->target() == TcParser::FastSiS1) {
+      table->fast_entry(1)->target() == TcParser::FastBiS1) {
     // optional string str1 = 1;
     // The aux_idx points to the inlined_string_idx and not the actual aux_idx.
     EXPECT_EQ(table->fast_entry(1)->bits.aux_idx(), 1);

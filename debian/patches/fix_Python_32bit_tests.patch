@@ -17,7 +17,7 @@ Last-Update: 2023-11-22
  import unittest
  import warnings
  
-@@ -353,16 +354,18 @@ class DescriptorTest(unittest.TestCase):
+@@ -356,16 +357,18 @@ class DescriptorTest(unittest.TestCase):
          unittest_custom_options_pb2.int32_opt])
      self.assertEqual(kint64max, message_options.Extensions[
          unittest_custom_options_pb2.int64_opt])
@@ -42,7 +42,7 @@ Last-Update: 2023-11-22
      self.assertEqual(kint32max, message_options.Extensions[
 --- a/python/google/protobuf/internal/json_format_test.py
 +++ b/python/google/protobuf/internal/json_format_test.py
-@@ -37,7 +37,7 @@ class JsonFormatBase(unittest.TestCase):
+@@ -38,7 +38,7 @@ class JsonFormatBase(unittest.TestCase):
    def FillAllFields(self, message):
      message.int32_value = 20
      message.int64_value = -20
@@ -51,24 +51,24 @@ Last-Update: 2023-11-22
      message.uint64_value = 12345678900
      message.float_value = float('-inf')
      message.double_value = 3.1415
-@@ -105,7 +105,7 @@ class JsonFormatTest(JsonFormatBase):
-     message = json_format_proto3_pb2.TestMessage()
-     text = ('{"int32Value": 20, '
-             '"int64Value": "-20", '
--            '"uint32Value": 3120987654,'
-+            '"uint32Value": 2147483647,'
-             '"uint64Value": "12345678900",'
-             '"floatValue": "-Infinity",'
-             '"doubleValue": 3.1415,'
-@@ -118,7 +118,7 @@ class JsonFormatTest(JsonFormatBase):
-             '"repeatedInt64Value": ["9007199254740992", "-9007199254740992"],'
-             '"repeatedUint32Value": [268435455, 134217727],'
-             '"repeatedUint64Value": ["9007199254740992", "9007199254740991"],'
--            '"repeatedFloatValue": [0],'
-+            '"repeatedFloatValue": [0.0],'
-             '"repeatedDoubleValue": [1e-15, "Infinity"],'
-             '"repeatedBoolValue": [true, false],'
-             '"repeatedStringValue": ["Few symbols!#$,;", "bar"],'
+@@ -107,7 +107,7 @@ class JsonFormatTest(JsonFormatBase):
+     text = (
+         '{"int32Value": 20, '
+         '"int64Value": "-20", '
+-        '"uint32Value": 3120987654,'
++        '"uint32Value": 2147483647,'
+         '"uint64Value": "12345678900",'
+         '"floatValue": "-Infinity",'
+         '"doubleValue": 3.1415,'
+@@ -120,7 +120,7 @@ class JsonFormatTest(JsonFormatBase):
+         '"repeatedInt64Value": ["9007199254740992", "-9007199254740992"],'
+         '"repeatedUint32Value": [268435455, 134217727],'
+         '"repeatedUint64Value": ["9007199254740992", "9007199254740991"],'
+-        '"repeatedFloatValue": [0],'
++        '"repeatedFloatValue": [0.0],'
+         '"repeatedDoubleValue": [1e-15, "Infinity"],'
+         '"repeatedBoolValue": [true, false],'
+         '"repeatedStringValue": ["Few symbols!#$,;", "bar"],'
 --- a/python/google/protobuf/internal/reflection_test.py
 +++ b/python/google/protobuf/internal/reflection_test.py
 @@ -13,6 +13,7 @@ pure-Python protocol compiler.
@@ -78,8 +78,8 @@ Last-Update: 2023-11-22
 +import platform
  import struct
  import sys
- import warnings
-@@ -430,7 +431,8 @@ class ReflectionTest(unittest.TestCase):
+ import unittest
+@@ -425,7 +426,8 @@ class ReflectionTest(unittest.TestCase):
                          expected_max + 1)
  
      TestMinAndMaxIntegers('optional_int32', -(1 << 31), (1 << 31) - 1)
@@ -98,8 +98,8 @@ Last-Update: 2023-11-22
 +import platform
  import unittest
  
- from google.protobuf import any_pb2
-@@ -242,17 +243,18 @@ class TimeUtilTest(TimeUtilTestBase):
+ from google.protobuf import json_format
+@@ -234,17 +235,18 @@ class TimeUtilTest(TimeUtilTestBase):
    def testTimezoneNaiveDatetimeConversionWhereTimestampLosesPrecision(self):
      ts = timestamp_pb2.Timestamp()
      naive_future = datetime.datetime(2555, 2, 22, 1, 2, 3, 456789)
@@ -129,7 +129,7 @@ Last-Update: 2023-11-22
  
    def testTimezoneNaiveMaxDatetimeConversion(self):
      ts = timestamp_pb2.Timestamp()
-@@ -321,15 +323,16 @@ class TimeUtilTest(TimeUtilTestBase):
+@@ -314,15 +316,16 @@ class TimeUtilTest(TimeUtilTestBase):
      tz = _TZ_PACIFIC
      ts = timestamp_pb2.Timestamp()
      tz_aware_future = datetime.datetime(2555, 2, 22, 1, 2, 3, 456789, tzinfo=tz)

@@ -49,10 +49,7 @@ void WithPresenceAccessorsInMsgImpl(Context& ctx, const FieldDescriptor& field,
                      R"rs(
                   pub fn has_$raw_field_name$($view_self$) -> bool {
                     unsafe {
-                      let f = $pbr$::upb_MiniTable_GetFieldByIndex(
-                          <Self as $pbr$::AssociatedMiniTable>::mini_table(),
-                          $upb_mt_field_index$);
-                      $pbr$::upb_Message_HasBaseField(self.raw_msg(), f)
+                      self.inner.ptr().has_field_at_index($upb_mt_field_index$)
                     }
                   }
                   )rs");
@@ -72,10 +69,9 @@ void WithPresenceAccessorsInMsgImpl(Context& ctx, const FieldDescriptor& field,
                      R"rs(
                     pub fn clear_$raw_field_name$(&mut self) {
                       unsafe {
-                        let mt = <Self as $pbr$::AssociatedMiniTable>::mini_table();
-                        let f = $pbr$::upb_MiniTable_GetFieldByIndex(
-                            mt, $upb_mt_field_index$);
-                        $pbr$::upb_Message_ClearBaseField(self.raw_msg(), f);
+                        self.inner.ptr().clear_field_at_index(
+                          $upb_mt_field_index$
+                        );
                       }
                     })rs");
           }
@@ -91,8 +87,8 @@ void WithPresenceAccessorsInMsgImpl(Context& ctx, const FieldDescriptor& field,
           }
           ctx.Emit(
               R"rs(
-              pub fn $raw_field_name$_opt($view_self$) -> $pb$::Optional<$view_type$> {
-                    $pb$::Optional::new(self.$field$(), self.has_$raw_field_name$())
+              pub fn $raw_field_name$_opt($view_self$) -> $std$::option::Option<$view_type$> {
+                self.has_$raw_field_name$().then(|| self.$field$())
               }
               )rs");
         }}},

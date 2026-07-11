@@ -10,6 +10,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <cassert>
+#include <cstdint>  // NOLINT
+#include <limits>
+
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/base/config.h"
 
@@ -19,10 +24,13 @@
 namespace google {
 namespace protobuf {
 namespace internal {
+namespace {
+
+using ::testing::HasSubstr;
 
 int assume_var_for_test = 1;
 
-TEST(PortTest, ProtobufAssume) {
+TEST(PortDeathTest, ProtobufAssume) {
   PROTOBUF_ASSUME(assume_var_for_test == 1);
 #ifdef GTEST_HAS_DEATH_TEST
 #if defined(NDEBUG)
@@ -38,7 +46,7 @@ TEST(PortTest, ProtobufAssume) {
 #endif
 }
 
-TEST(PortTest, UnreachableTrapsOnDebugMode) {
+TEST(PortDeathTest, UnreachableTrapsOnDebugMode) {
 #ifdef GTEST_HAS_DEATH_TEST
 #if defined(NDEBUG)
   // In NDEBUG we crash with a UD instruction, so we don't get the "Assumption
@@ -53,8 +61,119 @@ TEST(PortTest, UnreachableTrapsOnDebugMode) {
 #endif
 }
 
+#if defined(__clang__) && ABSL_HAVE_BUILTIN(__builtin_prefetch)
+
+// This test is only intended to ensure that `Prefetch()` continues to compile
+// and executes without crashing. It is difficult to programmatically verify the
+// correctness of the generated prefetch instruction sequences. However,
+// experiments in godbolt.org show that the generated code is correct and
+// optimal: a correct and linear sequence of prefetch instructions is generated
+// in the optimized modes.
+// TODO: Add a benchmark to verify the `Prefetch()` effectiveness.
+TEST(PortTest, PrefetchWorksWithValidOffsets) {
+  struct Base {
+    char a[256] = {1};
+  };
+  struct Derived : Base {
+    char b[1024] = {2};
+  };
+
+  Derived derived_array[3] = {};
+  Base* base_ptr = derived_array;
+
+  constexpr uintptr_t kOkOffset = sizeof(Derived) / 2;
+  constexpr uintptr_t kJustBeyondOffset = sizeof(Derived);
+  // A prefetch of a guaranteed valid address (using lines).
+  {
+    static constexpr PrefetchOpts kOpts = {
+        {1, PrefetchOpts::kLines},
+        {kOkOffset, PrefetchOpts::kBytes},
+    };
+    Prefetch<kOpts>(base_ptr);
+  }
+  // A prefetch of a guaranteed valid address (using bytes not wholly divisible
+  // into lines).
+  {
+    static constexpr PrefetchOpts kOpts = {
+        {sizeof(Derived) / 2, PrefetchOpts::kBytes},
+        {kOkOffset, PrefetchOpts::kBytes},
+    };
+    Prefetch<kOpts>(base_ptr);
+  }
+  // Stay within the unrolled for-loop body in `Prefetch()`.
+  {
+    static constexpr PrefetchOpts kOpts = {
+        {8, PrefetchOpts::kLines},
+        {kOkOffset, PrefetchOpts::kBytes},
+    };
+    Prefetch<kOpts>(base_ptr);
+  }
+  // Hit multiple iterations of the unrolled for-loop body in `Prefetch()`.
+  {
+    static constexpr PrefetchOpts kOpts = {
+        {100, PrefetchOpts::kLines},
+        {kOkOffset, PrefetchOpts::kBytes},
+    };
+    Prefetch<kOpts>(base_ptr);
+  }
+  // `base_ptr` actually points to an array of `Derived`s. Test that an explicit
+  // non-void pointed-to template parameter compiles and doesn't trigger the
+  // "type mismatch with actual pointer type" static assert.
+  {
+    static constexpr PrefetchOpts kOpts = {
+        {2, PrefetchOpts::kObjects},
+        {kOkOffset, PrefetchOpts::kBytes},
+    };
+    Prefetch<kOpts, Derived>(base_ptr);
+  }
+  // A prefetch of an invalid address (beyond the end of the buffer) is valid
+  // and is just a no-op.
+  {
+    static constexpr PrefetchOpts kOpts = {
+        {2, PrefetchOpts::kLines},
+        {kJustBeyondOffset, PrefetchOpts::kBytes},
+    };
+    Prefetch<kOpts>(base_ptr);
+  }
+}
+
+#endif  // defined(__clang__) && ABSL_HAVE_BUILTIN(__builtin_prefetch)
+
+TEST(PortTest, CheckedAdd) {
+  int n = (std::numeric_limits<int>::max)();
+  EXPECT_EQ(n, CheckedAdd(n - 1, 1));
+  EXPECT_DEATH(CheckedAdd(n, 1),
+               HasSubstr("Integer overflow in CheckedAdd: 2147483647 + 1"));
+}
+
+TEST(PortTest, CheckedAddWithLargerTypes) {
+  int64_t x = (std::numeric_limits<int>::max)() - 1;
+  EXPECT_EQ((std::numeric_limits<int>::max)(), CheckedAdd(x, 1));
+  x *= 2;
+  EXPECT_DEATH(CheckedAdd(x, 0),
+               HasSubstr("Integer overflow in CheckedAdd: 4294967292 + 0"));
+
+  x = (std::numeric_limits<int>::min)();
+  x -= 10;
+  EXPECT_DEATH(CheckedAdd(x, 0),
+               HasSubstr("Integer overflow in CheckedAdd: -2147483658 + 0"));
+}
+
+}  // namespace
 }  // namespace internal
 }  // namespace protobuf
 }  // namespace google
+
+// To dump via lldb and inspect the generated assembly.
+int CodegenCheckedAddInt(int a, int b) {
+  return google::protobuf::internal::CheckedAdd(a, b);
+}
+
+int CodegenCheckedAddSizeT(int a, size_t b) {
+  return google::protobuf::internal::CheckedAdd(a, b);
+}
+
+int odr_use = (google::protobuf::internal::StrongPointer(&CodegenCheckedAddInt),
+               google::protobuf::internal::StrongPointer(&CodegenCheckedAddSizeT), 1);
 
 #include "google/protobuf/port_undef.inc"

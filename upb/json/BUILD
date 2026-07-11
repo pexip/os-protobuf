@@ -1,12 +1,14 @@
 # TODO: describe this package.
 
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load("//bazel:proto_library.bzl", "proto_library")
+load("//upb/bazel:copts.bzl", "UPB_DEFAULT_COPTS", "UPB_DEFAULT_FEATURES")
 load(
-    "//bazel:upb_proto_library.bzl",
+    "//upb/bazel:upb_proto_library.bzl",
     "upb_c_proto_library",
     "upb_proto_reflection_library",
 )
-load("//upb/bazel:build_defs.bzl", "UPB_DEFAULT_COPTS")
 
 package(default_applicable_licenses = ["//:license"])
 
@@ -21,16 +23,17 @@ cc_library(
         "encode.h",
     ],
     copts = UPB_DEFAULT_COPTS,
+    features = UPB_DEFAULT_FEATURES,
     visibility = ["//visibility:public"],
     deps = [
-        "//upb:base",
-        "//upb:mem",
-        "//upb:message",
-        "//upb:mini_table",
-        "//upb:port",
-        "//upb:reflection",
-        "//upb:wire",
+        "//upb/base",
         "//upb/lex",
+        "//upb/mem",
+        "//upb/message",
+        "//upb/mini_table",
+        "//upb/port",
+        "//upb/reflection",
+        "//upb/wire",
     ],
 )
 
@@ -41,10 +44,12 @@ cc_test(
         ":json",
         ":test_upb_proto",
         ":test_upb_proto_reflection",
+        "//:any_upb_proto",
+        "//:field_mask_upb_proto",
         "//:struct_upb_proto",
-        "//upb:base",
-        "//upb:mem",
-        "//upb:reflection",
+        "//upb/base",
+        "//upb/mem",
+        "//upb/reflection",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -57,10 +62,12 @@ cc_test(
         ":json",
         ":test_upb_proto",
         ":test_upb_proto_reflection",
+        "//:any_upb_proto",
+        "//:field_mask_upb_proto",
         "//:struct_upb_proto",
-        "//upb:base",
-        "//upb:mem",
-        "//upb:reflection",
+        "//upb/base",
+        "//upb/mem",
+        "//upb/reflection",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -70,7 +77,11 @@ proto_library(
     name = "test_proto",
     testonly = 1,
     srcs = ["test.proto"],
-    deps = ["//:struct_proto"],
+    deps = [
+        "//:any_proto",
+        "//:field_mask_proto",
+        "//:struct_proto",
+    ],
 )
 
 upb_c_proto_library(

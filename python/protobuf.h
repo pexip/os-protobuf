@@ -8,11 +8,19 @@
 #ifndef PYUPB_PROTOBUF_H__
 #define PYUPB_PROTOBUF_H__
 
+// clang-format off
+#include "Python.h"
+// clang-format on
+#include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #include "python/descriptor.h"
 #include "python/python_api.h"
 #include "upb/hash/int_table.h"
+#include "upb/mem/arena.h"
+#include "upb/reflection/def.h"
 
 #define PYUPB_PROTOBUF_PUBLIC_PACKAGE "google.protobuf"
 #define PYUPB_PROTOBUF_INTERNAL_PACKAGE "google.protobuf.internal"
@@ -65,6 +73,7 @@ typedef struct {
   PyObject* encode_error_class;
   PyObject* enum_type_wrapper_class;
   PyObject* message_class;
+  PyObject* frozen_instance_error_class;
   PyTypeObject* cmessage_type;
   PyTypeObject* message_meta_type;
   PyObject* listfields_item_key;
@@ -135,6 +144,12 @@ PyObject* PyUpb_WeakMap_Get(PyUpb_WeakMap* map, const void* key);
 // }
 //
 // Note that the callee does not own a ref on the returned `obj`.
+//
+// WARNING: The iterator will hold a lock on the weak map until the iteration
+// is complete. The caller must complete the iteration, otherwise the lock will
+// never be released. The only function that can be called on the weak map
+// during iteration is PyUpb_WeakMap_DeleteIter(), which will delete the
+// current item but not change the iterator.
 bool PyUpb_WeakMap_Next(PyUpb_WeakMap* map, const void** key, PyObject** obj,
                         intptr_t* iter);
 void PyUpb_WeakMap_DeleteIter(PyUpb_WeakMap* map, intptr_t* iter);
@@ -146,6 +161,8 @@ void PyUpb_WeakMap_DeleteIter(PyUpb_WeakMap* map, intptr_t* iter);
 // The object cache is a global WeakMap for mapping upb objects to the
 // corresponding wrapper.
 void PyUpb_ObjCache_Add(const void* key, PyObject* py_obj);
+void PyUpb_KnownObjCache_Add(PyUpb_WeakMap* cache, const void* key,
+                             PyObject* py_obj);
 void PyUpb_ObjCache_Delete(const void* key);
 PyObject* PyUpb_ObjCache_Get(const void* key);  // returns NULL if not present.
 PyUpb_WeakMap* PyUpb_ObjCache_Instance(void);
@@ -183,8 +200,7 @@ PyObject* PyUpb_Forbidden_New(PyObject* cls, PyObject* args, PyObject* kwds);
 
 // Our standard dealloc func. It follows the guidance defined in:
 //   https://docs.python.org/3/c-api/typeobj.html#c.PyTypeObject.tp_dealloc
-// However it tests Py_TPFLAGS_HEAPTYPE dynamically so that a single dealloc
-// function can work for any type.
+// It requires that the type is a heap type, which all of our types are.
 static inline void PyUpb_Dealloc(void* self) {
   PyTypeObject* tp = Py_TYPE(self);
   assert(PyType_GetFlags(tp) & Py_TPFLAGS_HEAPTYPE);
@@ -211,4 +227,12 @@ const char* PyUpb_VerifyStrData(PyObject* obj);
 // or descriptor sequence of size 'size'.
 bool PyUpb_IndexToRange(PyObject* index, Py_ssize_t size, Py_ssize_t* i,
                         Py_ssize_t* count, Py_ssize_t* step);
+
+// Sets a Python FrozenInstanceError with the default error message
+// ("Message is immutable.") and returns NULL.
+PyObject* PyUpb_SetFrozenError(void);
+// Sets a Python FrozenInstanceError with the given custom message and returns
+// NULL.
+PyObject* PyUpb_SetFrozenErrorWithMsg(const char* msg);
+
 #endif  // PYUPB_PROTOBUF_H__

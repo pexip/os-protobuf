@@ -5,7 +5,9 @@
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
 
-load("//upb/bazel:build_defs.bzl", "UPB_DEFAULT_COPTS")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//upb/bazel:copts.bzl", "UPB_DEFAULT_COPTS", "UPB_DEFAULT_FEATURES")
 
 package(default_applicable_licenses = ["//:license"])
 
@@ -14,18 +16,17 @@ cc_library(
     srcs = [
         "atoi.c",
         "round_trip.c",
-        "strtod.c",
         "unicode.c",
     ],
     hdrs = [
         "atoi.h",
         "round_trip.h",
-        "strtod.h",
         "unicode.h",
     ],
     copts = UPB_DEFAULT_COPTS,
+    features = UPB_DEFAULT_FEATURES,
     visibility = ["//visibility:public"],
-    deps = ["//upb:port"],
+    deps = ["//upb/port"],
 )
 
 cc_test(
@@ -70,5 +71,5 @@ filegroup(
             "**/*test.cc",
         ],
     ),
-    visibility = ["//pkg:__pkg__"],
+    visibility = ["//upb:__pkg__"],
 )

@@ -5,8 +5,8 @@
 // license that can be found in the LICENSE file or at
 // https://developers.google.com/open-source/licenses/bsd
 
-#ifndef GOOGLE_PROTOBUF_COMPILER_PHP_GENERATOR_H__
-#define GOOGLE_PROTOBUF_COMPILER_PHP_GENERATOR_H__
+#ifndef GOOGLE_PROTOBUF_COMPILER_PHP_PHP_GENERATOR_H__
+#define GOOGLE_PROTOBUF_COMPILER_PHP_PHP_GENERATOR_H__
 
 #include <cstdint>
 #include <string>
@@ -35,11 +35,12 @@ class PROTOC_EXPORT Generator : public CodeGenerator {
                    std::string* error) const override;
 
   uint64_t GetSupportedFeatures() const override {
-    return Feature::FEATURE_PROTO3_OPTIONAL;
+    return Feature::FEATURE_PROTO3_OPTIONAL |
+           Feature::FEATURE_SUPPORTS_EDITIONS;
   }
 
   Edition GetMinimumEdition() const override { return Edition::EDITION_PROTO2; }
-  Edition GetMaximumEdition() const override { return Edition::EDITION_2023; }
+  Edition GetMaximumEdition() const override { return Edition::EDITION_2026; }
   std::vector<const FieldDescriptor*> GetFeatureExtensions() const override {
     return {};
   }
@@ -64,4 +65,4 @@ inline bool IsWrapperType(const FieldDescriptor* descriptor) {
 
 #include "google/protobuf/port_undef.inc"
 
-#endif  // GOOGLE_PROTOBUF_COMPILER_PHP_GENERATOR_H__
+#endif  // GOOGLE_PROTOBUF_COMPILER_PHP_PHP_GENERATOR_H__

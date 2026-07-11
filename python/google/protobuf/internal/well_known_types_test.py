@@ -16,6 +16,7 @@ import unittest
 from google.protobuf import json_format
 from google.protobuf import text_format
 from google.protobuf.internal import more_messages_pb2
+from google.protobuf.internal import testing_refleaks
 from google.protobuf.internal import well_known_types
 from google.protobuf.internal import well_known_types_test_pb2
 
@@ -54,6 +55,7 @@ class TimeUtilTestBase(parameterized.TestCase):
     self.assertEqual(message, parsed_message)
 
 
+@testing_refleaks.TestCase
 class TimeUtilTest(TimeUtilTestBase):
 
   def testTimestampSerializeAndParse(self):
@@ -528,7 +530,7 @@ class TimeUtilTest(TimeUtilTestBase):
     )
     self.assertRaisesRegex(
         ValueError,
-        'year (0 )?is out of range',
+        'year ',
         message.FromJsonString,
         '0000-01-01T00:00:00Z',
     )
@@ -538,10 +540,10 @@ class TimeUtilTest(TimeUtilTestBase):
     self.assertRaisesRegex(ValueError, 'Timestamp is not valid',
                            message.FromSeconds, -62135596801)
     msg = well_known_types_test_pb2.WKTMessage()
-    with self.assertRaises(AttributeError):
+    with self.assertRaises((TypeError)):
       msg.optional_timestamp = 1
 
-    with self.assertRaises(AttributeError):
+    with self.assertRaises((TypeError)):
       msg2 = well_known_types_test_pb2.WKTMessage(optional_timestamp=1)
 
     with self.assertRaises(TypeError):
@@ -604,10 +606,10 @@ class TimeUtilTest(TimeUtilTestBase):
         message.ToJsonString,
     )
     msg = well_known_types_test_pb2.WKTMessage()
-    with self.assertRaises(AttributeError):
+    with self.assertRaises((TypeError, AttributeError)):
       msg.optional_duration = 1
 
-    with self.assertRaises(AttributeError):
+    with self.assertRaises((TypeError, AttributeError)):
       msg2 = well_known_types_test_pb2.WKTMessage(optional_duration=1)
 
     with self.assertRaises(TypeError):
@@ -704,6 +706,7 @@ class TimeUtilTest(TimeUtilTestBase):
     self.assertEqual(expected_nano, msg.optional_timestamp.nanos)
 
 
+@testing_refleaks.TestCase
 class StructTest(unittest.TestCase):
 
   def testEmptyDict(self):
@@ -836,6 +839,14 @@ class StructTest(unittest.TestCase):
         [6, True, False, None, inner_struct], list(struct['key5'].items())
     )
 
+  def testSerializeDeeplyNestedStruct(self):
+    s = struct_pb2.Struct()
+    current = s
+    for _ in range(45):
+      current = current.fields['x'].struct_value
+    current.fields['v'].number_value = 1
+    self.assertGreater(len(s.SerializeToString()), 0)
+
   def testInOperator(self):
     # in operator for Struct
     struct = struct_pb2.Struct()
@@ -942,6 +953,30 @@ class StructTest(unittest.TestCase):
     msg3 = well_known_types_test_pb2.WKTMessage(optional_struct=dictionary3)
     self.assertEqual(msg3.optional_struct, {'key1': 5.0})
 
+  def testRepeatedStructConstruct(self):
+    dict0 = {'key1': 6.0}
+    dict1 = {
+        'key1': 'abc',
+        'key2': {'subkey': 11.0, 'k': True},
+    }
+    value_msg = struct_pb2.Value(number_value=5.0)
+    dict2 = {'fields': {'key1': value_msg}}
+    msg = well_known_types_test_pb2.WKTMessage(
+        repeated_struct=[dict0, dict1, dict2]
+    )
+    self.assertEqual(len(msg.repeated_struct), 3)
+    self.assertEqual(msg.repeated_struct[0], dict0)
+    self.assertEqual(msg.repeated_struct[1], dict1)
+    self.assertEqual(msg.repeated_struct[2], {'key1': 5.0})
+
+  def testRepeatedListValueConstruct(self):
+    list0 = [6, 'seven', True, False]
+    list1 = [None, {'key': 1.2}]
+    msg = well_known_types_test_pb2.WKTMessage(repeated_list=[list0, list1])
+    self.assertEqual(len(msg.repeated_list), 2)
+    self.assertEqual(msg.repeated_list[0], list0)
+    self.assertEqual(msg.repeated_list[1], list1)
+
   def testMergeFrom(self):
     struct = struct_pb2.Struct()
     struct_class = struct.__class__
@@ -987,6 +1022,7 @@ class StructTest(unittest.TestCase):
     self.assertEqual(5, struct['key5'][0][1])
 
 
+@testing_refleaks.TestCase
 class AnyTest(unittest.TestCase):
 
   def testAnyMessage(self):

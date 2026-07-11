@@ -12,10 +12,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 
 /**
@@ -209,40 +209,26 @@ public final class UnknownFieldSet implements MessageLite {
   }
 
   /** Serializes the set and writes it to {@code writer}. */
-  void writeTo(Writer writer) throws IOException {
+  void writeTo(CodedOutputStreamWriter writer) throws IOException {
     if (fields.isEmpty()) {
       // Avoid allocating an iterator.
       return;
     }
-    if (writer.fieldOrder() == Writer.FieldOrder.DESCENDING) {
-      // Write fields in descending order.
-      for (Map.Entry<Integer, Field> entry : fields.descendingMap().entrySet()) {
-        entry.getValue().writeTo(entry.getKey(), writer);
-      }
-    } else {
-      // Write fields in ascending order.
-      for (Map.Entry<Integer, Field> entry : fields.entrySet()) {
-        entry.getValue().writeTo(entry.getKey(), writer);
-      }
+    // Write fields in ascending order.
+    for (Map.Entry<Integer, Field> entry : fields.entrySet()) {
+      entry.getValue().writeTo(entry.getKey(), writer);
     }
   }
 
   /** Serializes the set and writes it to {@code writer} using {@code MessageSet} wire format. */
-  void writeAsMessageSetTo(Writer writer) throws IOException {
+  void writeAsMessageSetTo(CodedOutputStreamWriter writer) throws IOException {
     if (fields.isEmpty()) {
       // Avoid allocating an iterator.
       return;
     }
-    if (writer.fieldOrder() == Writer.FieldOrder.DESCENDING) {
-      // Write fields in descending order.
-      for (Map.Entry<Integer, Field> entry : fields.descendingMap().entrySet()) {
-        entry.getValue().writeAsMessageSetExtensionTo(entry.getKey(), writer);
-      }
-    } else {
-      // Write fields in ascending order.
-      for (Map.Entry<Integer, Field> entry : fields.entrySet()) {
-        entry.getValue().writeAsMessageSetExtensionTo(entry.getKey(), writer);
-      }
+    // Write fields in ascending order.
+    for (Map.Entry<Integer, Field> entry : fields.entrySet()) {
+      entry.getValue().writeAsMessageSetExtensionTo(entry.getKey(), writer);
     }
   }
 
@@ -749,17 +735,23 @@ public final class UnknownFieldSet implements MessageLite {
       if (!(other instanceof Field)) {
         return false;
       }
-      return Arrays.equals(getIdentityArray(), ((Field) other).getIdentityArray());
+      Field that = (Field) other;
+      return Objects.equals(varint, that.varint)
+          && Objects.equals(fixed32, that.fixed32)
+          && Objects.equals(fixed64, that.fixed64)
+          && Objects.equals(lengthDelimited, that.lengthDelimited)
+          && Objects.equals(group, that.group);
     }
 
     @Override
     public int hashCode() {
-      return Arrays.hashCode(getIdentityArray());
-    }
-
-    /** Returns the array of objects to be used to uniquely identify this {@link Field} instance. */
-    private Object[] getIdentityArray() {
-      return new Object[] {varint, fixed32, fixed64, lengthDelimited, group};
+      int result = 1;
+      result = 31 * result + Objects.hashCode(varint);
+      result = 31 * result + Objects.hashCode(fixed32);
+      result = 31 * result + Objects.hashCode(fixed64);
+      result = 31 * result + Objects.hashCode(lengthDelimited);
+      result = 31 * result + Objects.hashCode(group);
+      return result;
     }
 
     /**
@@ -783,15 +775,15 @@ public final class UnknownFieldSet implements MessageLite {
     @SuppressWarnings({"ForeachList", "ForeachListWithUserVar"}) // No iterator allocation.
     public void writeTo(int fieldNumber, CodedOutputStream output) throws IOException {
       for (int i = 0; i < varint.size(); i++) {
-        long value = varint.get(i);
+        long value = varint.getLong(i);
         output.writeUInt64(fieldNumber, value);
       }
       for (int i = 0; i < fixed32.size(); i++) {
-        int value = fixed32.get(i);
+        int value = fixed32.getInt(i);
         output.writeFixed32(fieldNumber, value);
       }
       for (int i = 0; i < fixed64.size(); i++) {
-        long value = fixed64.get(i);
+        long value = fixed64.getLong(i);
         output.writeFixed64(fieldNumber, value);
       }
       for (int i = 0; i < lengthDelimited.size(); i++) {
@@ -809,15 +801,15 @@ public final class UnknownFieldSet implements MessageLite {
     public int getSerializedSize(int fieldNumber) {
       int result = 0;
       for (int i = 0; i < varint.size(); i++) {
-        long value = varint.get(i);
+        long value = varint.getLong(i);
         result += CodedOutputStream.computeUInt64Size(fieldNumber, value);
       }
       for (int i = 0; i < fixed32.size(); i++) {
-        int value = fixed32.get(i);
+        int value = fixed32.getInt(i);
         result += CodedOutputStream.computeFixed32Size(fieldNumber, value);
       }
       for (int i = 0; i < fixed64.size(); i++) {
-        long value = fixed64.get(i);
+        long value = fixed64.getLong(i);
         result += CodedOutputStream.computeFixed64Size(fieldNumber, value);
       }
       for (int i = 0; i < lengthDelimited.size(); i++) {
@@ -845,24 +837,17 @@ public final class UnknownFieldSet implements MessageLite {
     }
 
     /** Serializes the field, including field number, and writes it to {@code writer}. */
-    void writeTo(int fieldNumber, Writer writer) throws IOException {
+    void writeTo(int fieldNumber, CodedOutputStreamWriter writer) throws IOException {
       writer.writeInt64List(fieldNumber, varint, false);
       writer.writeFixed32List(fieldNumber, fixed32, false);
       writer.writeFixed64List(fieldNumber, fixed64, false);
       writer.writeBytesList(fieldNumber, lengthDelimited);
 
-      if (writer.fieldOrder() == Writer.FieldOrder.ASCENDING) {
-        for (int i = 0; i < group.size(); i++) {
-          writer.writeStartGroup(fieldNumber);
-          group.get(i).writeTo(writer);
-          writer.writeEndGroup(fieldNumber);
-        }
-      } else {
-        for (int i = group.size() - 1; i >= 0; i--) {
-          writer.writeEndGroup(fieldNumber);
-          group.get(i).writeTo(writer);
-          writer.writeStartGroup(fieldNumber);
-        }
+      // Write in ascending field order.
+      for (int i = 0; i < group.size(); i++) {
+        writer.writeStartGroup(fieldNumber);
+        group.get(i).writeTo(writer);
+        writer.writeEndGroup(fieldNumber);
       }
     }
 
@@ -871,19 +856,12 @@ public final class UnknownFieldSet implements MessageLite {
      * MessageSet} wire format.
      */
     @SuppressWarnings({"ForeachList", "ForeachListWithUserVar"}) // No iterator allocation.
-    private void writeAsMessageSetExtensionTo(int fieldNumber, Writer writer) throws IOException {
-      if (writer.fieldOrder() == Writer.FieldOrder.DESCENDING) {
-        // Write in descending field order.
-        for (int i = lengthDelimited.size() - 1; i >= 0; i--) {
-          ByteString value = lengthDelimited.get(i);
-          writer.writeMessageSetItem(fieldNumber, value);
-        }
-      } else {
-        // Write in ascending field order.
-        for (int i = 0; i < lengthDelimited.size(); i++) {
-          ByteString value = lengthDelimited.get(i);
-          writer.writeMessageSetItem(fieldNumber, value);
-        }
+    private void writeAsMessageSetExtensionTo(int fieldNumber, CodedOutputStreamWriter writer)
+        throws IOException {
+      // Write in ascending field order.
+      for (int i = 0; i < lengthDelimited.size(); i++) {
+        ByteString value = lengthDelimited.get(i);
+        writer.writeMessageSetItem(fieldNumber, value);
       }
     }
 
@@ -901,9 +879,9 @@ public final class UnknownFieldSet implements MessageLite {
       return result;
     }
 
-    private List<Long> varint;
-    private List<Integer> fixed32;
-    private List<Long> fixed64;
+    private LongArrayList varint;
+    private IntArrayList fixed32;
+    private LongArrayList fixed64;
     private List<ByteString> lengthDelimited;
     private List<UnknownFieldSet> group;
 
@@ -931,17 +909,17 @@ public final class UnknownFieldSet implements MessageLite {
         if (result.varint == null) {
           copy.varint = null;
         } else {
-          copy.varint = new ArrayList<>(result.varint);
+          copy.varint = new LongArrayList(result.varint, /* isMutable= */ true);
         }
         if (result.fixed32 == null) {
           copy.fixed32 = null;
         } else {
-          copy.fixed32 = new ArrayList<>(result.fixed32);
+          copy.fixed32 = new IntArrayList(result.fixed32, /* isMutable= */ true);
         }
         if (result.fixed64 == null) {
           copy.fixed64 = null;
         } else {
-          copy.fixed64 = new ArrayList<>(result.fixed64);
+          copy.fixed64 = new LongArrayList(result.fixed64, /* isMutable= */ true);
         }
         if (result.lengthDelimited == null) {
           copy.lengthDelimited = null;
@@ -965,19 +943,19 @@ public final class UnknownFieldSet implements MessageLite {
       public Field build() {
         Field built = new Field();
         if (result.varint == null) {
-          built.varint = Collections.emptyList();
+          built.varint = LongArrayList.emptyList();
         } else {
-          built.varint = Collections.unmodifiableList(new ArrayList<>(result.varint));
+          built.varint = new LongArrayList(result.varint, /* isMutable= */ false);
         }
         if (result.fixed32 == null) {
-          built.fixed32 = Collections.emptyList();
+          built.fixed32 = IntArrayList.emptyList();
         } else {
-          built.fixed32 = Collections.unmodifiableList(new ArrayList<>(result.fixed32));
+          built.fixed32 = new IntArrayList(result.fixed32, /* isMutable= */ false);
         }
         if (result.fixed64 == null) {
-          built.fixed64 = Collections.emptyList();
+          built.fixed64 = LongArrayList.emptyList();
         } else {
-          built.fixed64 = Collections.unmodifiableList(new ArrayList<>(result.fixed64));
+          built.fixed64 = new LongArrayList(result.fixed64, /* isMutable= */ false);
         }
         if (result.lengthDelimited == null) {
           built.lengthDelimited = Collections.emptyList();
@@ -995,6 +973,7 @@ public final class UnknownFieldSet implements MessageLite {
       }
 
       /** Discard the field's contents. */
+      @CanIgnoreReturnValue
       public Builder clear() {
         result = new Field();
         return this;
@@ -1004,22 +983,23 @@ public final class UnknownFieldSet implements MessageLite {
        * Merge the values in {@code other} into this field. For each list of values, {@code other}'s
        * values are append to the ones in this field.
        */
+      @CanIgnoreReturnValue
       public Builder mergeFrom(Field other) {
         if (!other.varint.isEmpty()) {
           if (result.varint == null) {
-            result.varint = new ArrayList<Long>();
+            result.varint = new LongArrayList();
           }
           result.varint.addAll(other.varint);
         }
         if (!other.fixed32.isEmpty()) {
           if (result.fixed32 == null) {
-            result.fixed32 = new ArrayList<Integer>();
+            result.fixed32 = new IntArrayList();
           }
           result.fixed32.addAll(other.fixed32);
         }
         if (!other.fixed64.isEmpty()) {
           if (result.fixed64 == null) {
-            result.fixed64 = new ArrayList<>();
+            result.fixed64 = new LongArrayList();
           }
           result.fixed64.addAll(other.fixed64);
         }
@@ -1039,33 +1019,37 @@ public final class UnknownFieldSet implements MessageLite {
       }
 
       /** Add a varint value. */
+      @CanIgnoreReturnValue
       public Builder addVarint(long value) {
         if (result.varint == null) {
-          result.varint = new ArrayList<>();
+          result.varint = new LongArrayList();
         }
-        result.varint.add(value);
+        result.varint.addLong(value);
         return this;
       }
 
       /** Add a fixed32 value. */
+      @CanIgnoreReturnValue
       public Builder addFixed32(int value) {
         if (result.fixed32 == null) {
-          result.fixed32 = new ArrayList<>();
+          result.fixed32 = new IntArrayList();
         }
-        result.fixed32.add(value);
+        result.fixed32.addInt(value);
         return this;
       }
 
       /** Add a fixed64 value. */
+      @CanIgnoreReturnValue
       public Builder addFixed64(long value) {
         if (result.fixed64 == null) {
-          result.fixed64 = new ArrayList<>();
+          result.fixed64 = new LongArrayList();
         }
-        result.fixed64.add(value);
+        result.fixed64.addLong(value);
         return this;
       }
 
       /** Add a length-delimited value. */
+      @CanIgnoreReturnValue
       public Builder addLengthDelimited(ByteString value) {
         if (result.lengthDelimited == null) {
           result.lengthDelimited = new ArrayList<>();
@@ -1075,6 +1059,7 @@ public final class UnknownFieldSet implements MessageLite {
       }
 
       /** Add an embedded group. */
+      @CanIgnoreReturnValue
       public Builder addGroup(UnknownFieldSet value) {
         if (result.group == null) {
           result.group = new ArrayList<>();

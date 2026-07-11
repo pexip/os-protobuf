@@ -16,6 +16,9 @@
 
 #include "upb/mem/arena.h"
 
+// Must be last.
+#include "upb/port/def.inc"
+
 namespace upb {
 
 class Arena {
@@ -36,10 +39,21 @@ class Arena {
   // block.
   bool Fuse(Arena& other) { return upb_Arena_Fuse(ptr(), other.ptr()); }
 
+  bool IsFused(Arena& other) const {
+    return upb_Arena_IsFused(ptr(), other.ptr());
+  }
+
+  void RefArena(const Arena& to) {
+    bool ok = upb_Arena_RefArena(ptr(), to.ptr());
+    UPB_UNUSED(ok);
+  }
+
  protected:
   std::unique_ptr<upb_Arena, decltype(&upb_Arena_Free)> ptr_;
 };
 }  // namespace upb
+
+#include "upb/port/undef.inc"
 
 #endif  // __cplusplus
 

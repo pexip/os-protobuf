@@ -1,3 +1,72 @@
+protobuf (36.0~rc1-1) experimental; urgency=medium
+
+  * New major upstream release.
+  * Update patches.
+  * Do not install utf8-range header files.
+  * Library transition from libproto*35 to libproto*36 .
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 12 Jul 2026 00:18:45 +0200
+
+protobuf (35.1-1) experimental; urgency=medium
+
+  [ Laszlo Boszormenyi (GCS) ]
+  * New major upstream release:
+    - fix CVE-2026-6409: denial of service vulnerability in the PHP
+      bindings (closes: #1134895).
+  * Build with external utf8-range library.
+  * Update patches.
+  * Library transition from libproto*25 to libproto*35 .
+  * Update homepage location.
+  * Remove now redundant Rules-Requires-Root value.
+  * Update copyright file.
+  * Update watch file.
+  * Update Standards-Version to 4.7.2 .
+
+  [ Ying-Chun Liu (PaulLiu) <paulliu@debian.org> ]
+  * Fix python3-protobuf build.
+  * Fix libprotobuf-java build.
+  * Fix ruby-google-protobuf build.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sat, 20 Jun 2026 16:37:31 +0200
+
+protobuf (3.25.7-1) experimental; urgency=medium
+
+  [ Laszlo Boszormenyi (GCS) ]
+  * New upstream release.
+  * Backport upstream security fix for CVE-2026-0994: denial of service
+    vulnerability in google.protobuf.json_format.ParseDict() in Python
+    (closes: #1126302).
+
+  [ Matthias Klose <doko@ubuntu.com> ]
+  * Fix one more FTBFS with GCC 15 (closes: #1126379).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 25 Jan 2026 08:55:08 +0100
+
+protobuf (3.25.4-4) experimental; urgency=medium
+
+  [ Adrian Bunk <bunk@debian.org> ]
+  * Disable the Python C extension, falling back to pure Python code
+    (closes: #1121893).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Sun, 11 Jan 2026 20:19:02 +0100
+
+protobuf (3.25.4-3) experimental; urgency=medium
+
+  * Fix Ruby extension install on i386.
+  * Backport upstream fix for update PROTOBUF_MUSTTAIL to only use the
+    attribute on amd64 and arm64.
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Thu, 25 Dec 2025 14:51:05 +0100
+
+protobuf (3.25.4-2) experimental; urgency=medium
+
+  * Fix building with gem2deb 2.2.6 (closes: #1120958).
+  * Backport upstream fix for Python 3.14 tests.
+  * Backport upstream fix for compiler warnings in the Ruby C extension.
+  * Fix Ruby extension build (closes: #1079852).
+
+ -- Laszlo Boszormenyi (GCS) <gcs@debian.org>  Thu, 18 Dec 2025 11:20:56 +0100
+
 protobuf (3.25.4-1) experimental; urgency=medium
 
   * New upstream release.

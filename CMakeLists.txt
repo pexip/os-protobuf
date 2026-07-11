@@ -14,6 +14,10 @@ endif()
 # Project
 project(protobuf C CXX)
 
+if(CMAKE_CXX_STANDARD AND CMAKE_CXX_STANDARD LESS 17)
+  message(FATAL_ERROR "The minimum supported C++ standard is C++ 17")
+endif()
+
 if(protobuf_DEPRECATED_CMAKE_SUBDIRECTORY_USAGE)
   if(CMAKE_PROJECT_NAME STREQUAL "protobuf")
     get_filename_component(CMAKE_SOURCE_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
@@ -25,11 +29,12 @@ endif()
 
 # Options
 option(protobuf_INSTALL "Install protobuf binaries and files" ON)
-option(protobuf_BUILD_TESTS "Build tests" ON)
+option(protobuf_BUILD_TESTS "Build tests" OFF)
 option(protobuf_BUILD_CONFORMANCE "Build conformance tests" OFF)
 option(protobuf_BUILD_EXAMPLES "Build examples" OFF)
 option(protobuf_BUILD_PROTOBUF_BINARIES "Build protobuf libraries and protoc compiler" ON)
 option(protobuf_BUILD_PROTOC_BINARIES "Build libprotoc and protoc compiler" ON)
+option(protobuf_BUILD_LIBPROTOBUF "Build libprotobuf" ON)
 option(protobuf_BUILD_LIBPROTOC "Build libprotoc" OFF)
 option(protobuf_BUILD_LIBUPB "Build libupb" ON)
 option(protobuf_DISABLE_RTTI "Remove runtime type information in the binaries" OFF)
@@ -86,17 +91,49 @@ if (protobuf_BUILD_SHARED_LIBS)
 endif ()
 
 # Version metadata
-set(protobuf_VERSION_STRING "6.31.1")
+set(protobuf_VERSION_STRING "7.36.0-rc-1")
 set(protobuf_DESCRIPTION "Protocol Buffers")
 set(protobuf_CONTACT "protobuf@googlegroups.com")
 
 # Overrides for option dependencies
-if (protobuf_BUILD_PROTOC_BINARIES OR protobuf_BUILD_TESTS)
-  set(protobuf_BUILD_LIBPROTOC ON)
-endif ()
 if (NOT protobuf_BUILD_PROTOBUF_BINARIES)
   set(protobuf_INSTALL OFF)
 endif()
+if (protobuf_BUILD_PROTOBUF_BINARIES AND NOT protobuf_BUILD_LIBPROTOBUF)
+  if (protobuf_BUILD_PROTOC_BINARIES)
+    message(FATAL_ERROR
+      "protobuf_BUILD_LIBPROTOBUF=OFF requires protobuf_BUILD_PROTOC_BINARIES=OFF.")
+  endif ()
+  if (protobuf_BUILD_TESTS)
+    message(FATAL_ERROR
+      "protobuf_BUILD_LIBPROTOBUF=OFF requires protobuf_BUILD_TESTS=OFF.")
+  endif ()
+  if (protobuf_BUILD_CONFORMANCE)
+    message(FATAL_ERROR
+      "protobuf_BUILD_LIBPROTOBUF=OFF requires protobuf_BUILD_CONFORMANCE=OFF.")
+  endif ()
+  if (protobuf_BUILD_EXAMPLES)
+    message(FATAL_ERROR
+      "protobuf_BUILD_LIBPROTOBUF=OFF requires protobuf_BUILD_EXAMPLES=OFF.")
+  endif ()
+  if (protobuf_BUILD_LIBUPB)
+    message(FATAL_ERROR
+      "protobuf_BUILD_LIBPROTOBUF=OFF requires protobuf_BUILD_LIBUPB=OFF.")
+  endif ()
+endif()
+if (protobuf_BUILD_PROTOC_BINARIES OR protobuf_BUILD_TESTS)
+  set(protobuf_BUILD_LIBPROTOC ON)
+endif ()
+if (protobuf_BUILD_PROTOBUF_BINARIES AND NOT protobuf_BUILD_LIBPROTOBUF AND protobuf_BUILD_LIBPROTOC)
+  message(FATAL_ERROR
+    "protobuf_BUILD_LIBPROTOBUF=OFF requires protobuf_BUILD_LIBPROTOC=OFF.")
+endif()
+
+if(protobuf_BUILD_LIBPROTOC AND NOT protobuf_BUILD_LIBUPB)
+  message(WARNING "Building protoc binaries requires building libupb. As such, protobuf_BUILD_LIBUPB is being forced to ON.")
+  set(protobuf_BUILD_LIBUPB ON)
+endif()
+
 # Parse version tweaks
 set(protobuf_VERSION_REGEX "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-]rc[-]|\\.)?([0-9]*)$")
 string(REGEX REPLACE     "${protobuf_VERSION_REGEX}" "\\1"
@@ -181,12 +218,10 @@ if (protobuf_WITH_ZLIB)
 endif (protobuf_WITH_ZLIB)
 
 # We need to link with libatomic on systems that do not have builtin atomics, or
-# don't have builtin support for 8 byte atomics
+# don't have builtin support for 8 byte atomics (e.g. 32-bit powerpc).
 set(protobuf_LINK_LIBATOMIC false)
 if (NOT MSVC)
   include(CheckCXXSourceCompiles)
-  set(OLD_CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS})
-  set(CMAKE_REQUIRED_FLAGS ${CMAKE_REQUIRED_FLAGS} -std=c++17)
   check_cxx_source_compiles("
     #include <atomic>
     int main() {
@@ -196,7 +231,6 @@ if (NOT MSVC)
   if (NOT protobuf_HAVE_BUILTIN_ATOMICS)
     set(protobuf_LINK_LIBATOMIC true)
   endif (NOT protobuf_HAVE_BUILTIN_ATOMICS)
-  set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
 endif (NOT MSVC)
 
 if (protobuf_BUILD_SHARED_LIBS)
@@ -278,9 +312,11 @@ if (protobuf_BUILD_PROTOBUF_BINARIES)
   if (NOT DEFINED protobuf_LIB_PROTOBUF_LITE)
     set(protobuf_LIB_PROTOBUF_LITE libprotobuf-lite)
   endif ()
-  include(${protobuf_SOURCE_DIR}/cmake/libprotobuf.cmake)
-  if (NOT DEFINED protobuf_LIB_PROTOBUF)
-    set(protobuf_LIB_PROTOBUF libprotobuf)
+  if (protobuf_BUILD_LIBPROTOBUF)
+    include(${protobuf_SOURCE_DIR}/cmake/libprotobuf.cmake)
+    if (NOT DEFINED protobuf_LIB_PROTOBUF)
+      set(protobuf_LIB_PROTOBUF libprotobuf)
+    endif ()
   endif ()
   if (protobuf_BUILD_LIBPROTOC)
     include(${protobuf_SOURCE_DIR}/cmake/libprotoc.cmake)

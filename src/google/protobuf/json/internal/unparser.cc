@@ -7,14 +7,10 @@
 
 #include "google/protobuf/json/internal/unparser.h"
 
-#include <cfloat>
 #include <cmath>
-#include <complex>
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <memory>
-#include <sstream>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -77,7 +73,7 @@ void WriteEnum(JsonWriter& writer, Field<Traits> field, int32_t value,
   if (!writer.options().always_print_enums_as_ints) {
     auto name = Traits::EnumNameByNumber(field, value);
     if (name.ok()) {
-      writer.Write("\"", *name, "\"");
+      writer.Write(MakeQuoted(*name));
       return;
     }
   }
@@ -90,7 +86,7 @@ void WriteEnum(JsonWriter& writer, Field<Traits> field, int32_t value,
 }
 
 // Returns true if x round-trips through being cast to a double, i.e., if
-// x is represenable exactly as a double. This is a slightly weaker condition
+// x is representable exactly as a double. This is a slightly weaker condition
 // than x < 2^52.
 template <typename Int>
 bool RoundTripsThroughDouble(Int x) {
@@ -104,7 +100,7 @@ bool RoundTripsThroughDouble(Int x) {
   // Thus, we have to go through ldexp.
   double min = 0;
   double max_plus_one = std::ldexp(1.0, sizeof(Int) * 8);
-  if (std::is_signed<Int>::value) {
+  if (std::is_signed_v<Int>) {
     max_plus_one /= 2;
     min = -max_plus_one;
   }
@@ -133,7 +129,7 @@ absl::Status WriteSingular(JsonWriter& writer, Field<Traits> field,
     case FieldDescriptor::TYPE_FLOAT: {
       auto x = Traits::GetFloat(field, std::forward<Args>(args)...);
       RETURN_IF_ERROR(x.status());
-      if (writer.options().allow_legacy_syntax && is_default &&
+      if (writer.options().allow_legacy_nonconformant_behavior && is_default &&
           !std::isfinite(*x)) {
         *x = 0;
       }
@@ -143,7 +139,7 @@ absl::Status WriteSingular(JsonWriter& writer, Field<Traits> field,
     case FieldDescriptor::TYPE_DOUBLE: {
       auto x = Traits::GetDouble(field, std::forward<Args>(args)...);
       RETURN_IF_ERROR(x.status());
-      if (writer.options().allow_legacy_syntax && is_default &&
+      if (writer.options().allow_legacy_nonconformant_behavior && is_default &&
           !std::isfinite(*x)) {
         *x = 0;
       }
@@ -207,7 +203,7 @@ absl::Status WriteSingular(JsonWriter& writer, Field<Traits> field,
       auto x = Traits::GetString(field, writer.ScratchBuf(),
                                  std::forward<Args>(args)...);
       RETURN_IF_ERROR(x.status());
-      if (writer.options().allow_legacy_syntax && is_default) {
+      if (writer.options().allow_legacy_nonconformant_behavior && is_default) {
         // Although difficult to verify, it appears that the original ESF parser
         // fails to unescape the contents of a
         // google.protobuf.Field.default_value, which may potentially be
@@ -279,8 +275,8 @@ absl::Status WriteRepeated(JsonWriter& writer, const Msg<Traits>& msg,
   return absl::OkStatus();
 }
 
-template <typename Traits>
-absl::Status WriteMapKey(JsonWriter& writer, const Msg<Traits>& entry,
+template <typename Traits, typename Entry>
+absl::Status WriteMapKey(JsonWriter& writer, const Entry& entry,
                          Field<Traits> field) {
   switch (Traits::FieldType(field)) {
     case FieldDescriptor::TYPE_SFIXED64:
@@ -355,34 +351,68 @@ absl::StatusOr<bool> IsEmptyValue(const Msg<Traits>& msg, Field<Traits> field) {
 }
 
 template <typename Traits>
+absl::StatusOr<bool> IsEmptyValue(const MapValueConstRef& value,
+                                  Field<Traits> field) {
+  if (ClassifyMessage(Traits::FieldTypeName(field)) != MessageType::kValue) {
+    return false;
+  }
+  const auto& inner = value.GetMessageValue();
+  return IsEmpty<Traits>(inner, *field->message_type());
+}
+
+template <typename Traits>
 absl::Status WriteMap(JsonWriter& writer, const Msg<Traits>& msg,
                       Field<Traits> field) {
   writer.Write("{");
   writer.Push();
 
-  size_t count = Traits::GetSize(field, msg);
   bool first = true;
-  for (size_t i = 0; i < count; ++i) {
-    absl::StatusOr<const Msg<Traits>*> entry =
-        Traits::GetMessage(field, msg, i);
-    RETURN_IF_ERROR(entry.status());
-    const Desc<Traits>& type = Traits::GetDesc(**entry);
 
-    auto is_empty = IsEmptyValue<Traits>(**entry, Traits::ValueField(type));
-    RETURN_IF_ERROR(is_empty.status());
-    if (*is_empty) {
-      // Empty google.protobuf.Values are silently discarded.
-      continue;
+  if (Traits::MapFieldUseMapReflection(field, msg)) {
+    RETURN_IF_ERROR(Traits::ForEachMapEntry(
+        field, msg, [&](auto it, const auto& type) -> absl::Status {
+          auto is_empty =
+              IsEmptyValue<Traits>(it.GetValueRef(), Traits::ValueField(type));
+          RETURN_IF_ERROR(is_empty.status());
+          if (*is_empty) {
+            // Empty google.protobuf.Values are silently discarded.
+            return absl::OkStatus();
+          }
+
+          writer.WriteComma(first);
+          writer.NewLine();
+          RETURN_IF_ERROR(
+              WriteMapKey<Traits>(writer, it.GetKey(), Traits::KeyField(type)));
+          writer.Write(":");
+          writer.Whitespace(" ");
+          RETURN_IF_ERROR(WriteSingular<Traits>(
+              writer, Traits::ValueField(type), it.GetValueRef()));
+          return absl::OkStatus();
+        }));
+  } else {
+    const size_t count = Traits::GetSize(field, msg);
+    for (size_t i = 0; i < count; ++i) {
+      absl::StatusOr<const Msg<Traits>*> entry =
+          Traits::GetMessage(field, msg, i);
+      RETURN_IF_ERROR(entry.status());
+      const Desc<Traits>& type = Traits::GetDesc(**entry);
+
+      auto is_empty = IsEmptyValue<Traits>(**entry, Traits::ValueField(type));
+      RETURN_IF_ERROR(is_empty.status());
+      if (*is_empty) {
+        // Empty google.protobuf.Values are silently discarded.
+        continue;
+      }
+
+      writer.WriteComma(first);
+      writer.NewLine();
+      RETURN_IF_ERROR(
+          WriteMapKey<Traits>(writer, **entry, Traits::KeyField(type)));
+      writer.Write(":");
+      writer.Whitespace(" ");
+      RETURN_IF_ERROR(
+          WriteSingular<Traits>(writer, Traits::ValueField(type), **entry));
     }
-
-    writer.WriteComma(first);
-    writer.NewLine();
-    RETURN_IF_ERROR(
-        WriteMapKey<Traits>(writer, **entry, Traits::KeyField(type)));
-    writer.Write(":");
-    writer.Whitespace(" ");
-    RETURN_IF_ERROR(
-        WriteSingular<Traits>(writer, Traits::ValueField(type), **entry));
   }
 
   writer.Pop();
@@ -421,7 +451,7 @@ absl::Status WriteField(JsonWriter& writer, const Msg<Traits>& msg,
     // with an uppercase letter, and the Json name does not, we uppercase it.
     absl::string_view original_name = Traits::FieldName(field);
     absl::string_view json_name = Traits::FieldJsonName(field);
-    if (writer.options().allow_legacy_syntax &&
+    if (writer.options().allow_legacy_nonconformant_behavior &&
         absl::ascii_isupper(original_name[0]) &&
         !absl::ascii_isupper(json_name[0])) {
       writer.Write(MakeQuoted(absl::ascii_toupper(original_name[0]),
@@ -580,34 +610,41 @@ template <typename Traits>
 absl::Status WriteTimestamp(JsonWriter& writer, const Msg<Traits>& msg,
                             const Desc<Traits>& desc) {
   auto secs_field = Traits::MustHaveField(desc, 1);
-  auto secs = Traits::GetSize(secs_field, msg) > 0
-                  ? Traits::GetInt64(secs_field, msg)
-                  : 0;
-  RETURN_IF_ERROR(secs.status());
+  auto status_or_secs = Traits::GetSize(secs_field, msg) > 0
+                            ? Traits::GetInt64(secs_field, msg)
+                            : 0;
+  RETURN_IF_ERROR(status_or_secs.status());
+  int64_t secs = *status_or_secs;
 
-  if (*secs < -62135596800) {
+  if (secs < -62135596800) {
     return absl::InvalidArgumentError(
         "minimum acceptable time value is 0001-01-01T00:00:00Z");
-  } else if (*secs > 253402300799) {
+  } else if (secs > 253402300799) {
     return absl::InvalidArgumentError(
         "maximum acceptable time value is 9999-12-31T23:59:59Z");
   }
 
   // Ensure seconds is positive.
-  *secs += 62135596800;
+  secs += 62135596800;
 
   auto nanos_field = Traits::MustHaveField(desc, 2);
-  auto nanos = Traits::GetSize(nanos_field, msg) > 0
-                   ? Traits::GetInt32(nanos_field, msg)
-                   : 0;
-  RETURN_IF_ERROR(nanos.status());
+  auto status_or_nanos = Traits::GetSize(nanos_field, msg) > 0
+                             ? Traits::GetInt32(nanos_field, msg)
+                             : 0;
+  RETURN_IF_ERROR(status_or_nanos.status());
+  int32_t nanos = *status_or_nanos;
+
+  if (nanos < 0 || nanos > 999999999) {
+    return absl::InvalidArgumentError(
+        "nanos must be in range [0, +999,999,999]");
+  }
 
   // Julian Day -> Y/M/D, Algorithm from:
   // Fliegel, H. F., and Van Flandern, T. C., "A Machine Algorithm for
   //   Processing Calendar Dates," Communications of the Association of
   //   Computing Machines, vol. 11 (1968), p. 657.
   int32_t L, N, I, J, K;
-  L = static_cast<int32_t>(*secs / 86400) - 719162 + 68569 + 2440588;
+  L = static_cast<int32_t>(secs / 86400) - 719162 + 68569 + 2440588;
   N = 4 * L / 146097;
   L = L - (146097 * N + 3) / 4;
   I = 4000 * (L + 1) / 1461001;
@@ -618,18 +655,18 @@ absl::Status WriteTimestamp(JsonWriter& writer, const Msg<Traits>& msg,
   J = J + 2 - 12 * L;
   I = 100 * (N - 49) + I + L;
 
-  int32_t sec = *secs % 60;
-  int32_t min = (*secs / 60) % 60;
-  int32_t hour = (*secs / 3600) % 24;
+  int32_t sec = secs % 60;
+  int32_t min = (secs / 60) % 60;
+  int32_t hour = (secs / 3600) % 24;
 
-  if (*nanos == 0) {
+  if (nanos == 0) {
     writer.Write(absl::StrFormat(R"("%04d-%02d-%02dT%02d:%02d:%02dZ")", I, J, K,
                                  hour, min, sec));
     return absl::OkStatus();
   }
 
   size_t digits = 9;
-  uint32_t frac_seconds = std::abs(*nanos);
+  uint32_t frac_seconds = std::abs(nanos);
   while (frac_seconds % 1000 == 0) {
     frac_seconds /= 1000;
     digits -= 3;
@@ -644,45 +681,47 @@ template <typename Traits>
 absl::Status WriteDuration(JsonWriter& writer, const Msg<Traits>& msg,
                            const Desc<Traits>& desc) {
   constexpr int64_t kMaxSeconds = int64_t{3652500} * 86400;
-  constexpr int64_t kMaxNanos = 999999999;
+  constexpr int32_t kMaxNanos = 999999999;
 
   auto secs_field = Traits::MustHaveField(desc, 1);
-  auto secs = Traits::GetSize(secs_field, msg) > 0
-                  ? Traits::GetInt64(secs_field, msg)
-                  : 0;
-  RETURN_IF_ERROR(secs.status());
+  auto status_or_secs = Traits::GetSize(secs_field, msg) > 0
+                            ? Traits::GetInt64(secs_field, msg)
+                            : 0;
+  RETURN_IF_ERROR(status_or_secs.status());
+  int64_t secs = *status_or_secs;
 
-  if (*secs > kMaxSeconds || *secs < -kMaxSeconds) {
+  if (secs > kMaxSeconds || secs < -kMaxSeconds) {
     return absl::InvalidArgumentError("duration out of range");
   }
 
   auto nanos_field = Traits::MustHaveField(desc, 2);
-  auto nanos = Traits::GetSize(nanos_field, msg) > 0
-                   ? Traits::GetInt32(nanos_field, msg)
-                   : 0;
-  RETURN_IF_ERROR(nanos.status());
+  auto status_or_nanos = Traits::GetSize(nanos_field, msg) > 0
+                             ? Traits::GetInt32(nanos_field, msg)
+                             : 0;
+  RETURN_IF_ERROR(status_or_nanos.status());
+  int32_t nanos = *status_or_nanos;
 
-  if (*nanos > kMaxNanos || *nanos < -kMaxNanos) {
+  if (nanos > kMaxNanos || nanos < -kMaxNanos) {
     return absl::InvalidArgumentError("duration out of range");
   }
-  if ((*secs != 0) && (*nanos != 0) && ((*secs < 0) != (*nanos < 0))) {
+  if ((secs != 0) && (nanos != 0) && ((secs < 0) != (nanos < 0))) {
     return absl::InvalidArgumentError("nanos and seconds signs do not match");
   }
 
-  if (*nanos == 0) {
-    writer.Write(absl::StrFormat(R"("%ds")", *secs));
+  if (nanos == 0) {
+    writer.Write(absl::StrFormat(R"("%ds")", secs));
     return absl::OkStatus();
   }
 
   size_t digits = 9;
-  uint32_t frac_seconds = std::abs(*nanos);
+  uint32_t frac_seconds = std::abs(nanos);
   while (frac_seconds % 1000 == 0) {
     frac_seconds /= 1000;
     digits -= 3;
   }
 
-  absl::string_view sign = ((*secs < 0) || (*nanos < 0)) ? "-" : "";
-  writer.Write(absl::StrFormat(R"("%s%d.%.*ds")", sign, std::abs(*secs), digits,
+  absl::string_view sign = ((secs < 0) || (nanos < 0)) ? "-" : "";
+  writer.Write(absl::StrFormat(R"("%s%d.%.*ds")", sign, std::abs(secs), digits,
                                frac_seconds));
   return absl::OkStatus();
 }
@@ -707,10 +746,11 @@ absl::Status WriteFieldMask(JsonWriter& writer, const Msg<Traits>& msg,
       } else if (absl::ascii_isdigit(c) || absl::ascii_islower(c) || c == '.') {
         writer.Write(c);
       } else if (c == '_' &&
-                 (!saw_under || writer.options().allow_legacy_syntax)) {
+                 (!saw_under ||
+                  writer.options().allow_legacy_nonconformant_behavior)) {
         saw_under = true;
         continue;
-      } else if (!writer.options().allow_legacy_syntax) {
+      } else if (!writer.options().allow_legacy_nonconformant_behavior) {
         return absl::InvalidArgumentError("unexpected character in FieldMask");
       } else {
         if (saw_under) {
@@ -739,8 +779,6 @@ absl::Status WriteAny(JsonWriter& writer, const Msg<Traits>& msg,
     return absl::OkStatus();
   } else if (!has_type_url) {
     return absl::InvalidArgumentError("broken Any: missing type URL");
-  } else if (!has_value && !writer.options().allow_legacy_syntax) {
-    return absl::InvalidArgumentError("broken Any: missing value");
   }
 
   writer.Write("{");

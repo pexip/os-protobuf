@@ -2,22 +2,22 @@ Description: Remove dependency on javax.annotation library
  It's not yet packaged and not mandatory.
 Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
 Forwarded: not-needed
-Last-Update: 2023-11-21
+Last-Update: 2026-07-12
 
 ---
 
 --- a/java/util/src/main/java/com/google/protobuf/util/FieldMaskUtil.java
 +++ b/java/util/src/main/java/com/google/protobuf/util/FieldMaskUtil.java
-@@ -23,7 +23,7 @@ import com.google.protobuf.Message;
- import java.util.ArrayList;
- import java.util.Arrays;
+@@ -18,7 +18,7 @@ import java.util.Arrays;
  import java.util.List;
+ import java.util.Optional;
+ import java.util.stream.Collectors;
 -import javax.annotation.Nullable;
 +//import javax.annotation.Nullable;
  
- /**
-  * Utility helper functions to work with {@link com.google.protobuf.FieldMask}.
-@@ -208,7 +208,7 @@ public final class FieldMaskUtil {
+ /** Utility helper functions to work with {@link com.google.protobuf.FieldMask}. */
+ public final class FieldMaskUtil {
+@@ -221,7 +221,7 @@ public final class FieldMaskUtil {
    }
  
    /** Checks whether paths in a given fields mask are valid. */
@@ -28,7 +28,7 @@ Last-Update: 2023-11-21
        return false;
 --- a/java/util/src/main/java/com/google/protobuf/util/JsonFormat.java
 +++ b/java/util/src/main/java/com/google/protobuf/util/JsonFormat.java
-@@ -64,7 +64,7 @@ import java.util.Map;
+@@ -65,7 +65,7 @@ import java.util.Map;
  import java.util.Set;
  import java.util.TreeMap;
  import java.util.logging.Logger;
@@ -37,7 +37,7 @@ Last-Update: 2023-11-21
  
  /**
   * Utility class to convert protobuf messages to/from the <a href=
-@@ -494,12 +494,10 @@ public class JsonFormat {
+@@ -664,12 +664,10 @@ public class JsonFormat {
       * Find a type by its full name. Returns null if it cannot be found in this {@link
       * TypeRegistry}.
       */
@@ -50,16 +50,16 @@ Last-Update: 2023-11-21
      Descriptor getDescriptorForTypeUrl(String typeUrl) throws InvalidProtocolBufferException {
        return find(getTypeName(typeUrl));
      }
-@@ -964,7 +962,7 @@ public class JsonFormat {
+@@ -1296,7 +1294,7 @@ public class JsonFormat {
      }
  
      /** Prints a regular message with an optional type URL. */
 -    private void print(MessageOrBuilder message, @Nullable String typeUrl) throws IOException {
 +    private void print(MessageOrBuilder message, String typeUrl) throws IOException {
-       generator.print("{" + blankOrNewLine);
+       generator.println("{");
        generator.indent();
  
-@@ -1891,7 +1889,6 @@ public class JsonFormat {
+@@ -2423,7 +2421,6 @@ public class JsonFormat {
        }
      }
  
@@ -67,37 +67,37 @@ Last-Update: 2023-11-21
      private EnumValueDescriptor parseEnum(EnumDescriptor enumDescriptor, JsonElement json)
          throws InvalidProtocolBufferException {
        String value = json.getAsString();
-@@ -1921,7 +1918,6 @@ public class JsonFormat {
-       return result;
+@@ -2454,7 +2451,6 @@ public class JsonFormat {
      }
  
+     @SuppressWarnings("AvoidValueSetter")
 -    @Nullable
      private Object parseFieldValue(FieldDescriptor field, JsonElement json, Message.Builder builder)
          throws InvalidProtocolBufferException {
        if (json instanceof JsonNull) {
 --- a/java/util/src/main/java/com/google/protobuf/util/Timestamps.java
 +++ b/java/util/src/main/java/com/google/protobuf/util/Timestamps.java
-@@ -27,7 +27,7 @@ import java.util.Date;
- import java.util.GregorianCalendar;
+@@ -25,7 +25,7 @@ import java.util.GregorianCalendar;
  import java.util.Locale;
  import java.util.TimeZone;
+ import java.util.logging.Logger;
 -import javax.annotation.Nullable;
 +//import javax.annotation.Nullable;
  
  /**
   * Utilities to help create/manipulate {@code protobuf/timestamp.proto}. All operations throw an
-@@ -288,13 +288,12 @@ public final class Timestamps {
+@@ -313,16 +313,12 @@ public final class Timestamps {
  
    // the following 3 constants contain references to java.time.Instant methods (if that class is
    // available at runtime); otherwise, they are null.
--  @Nullable private static final Method INSTANT_NOW = instantMethod("now");
-+  private static final Method INSTANT_NOW = instantMethod("now");
+-  @Nullable
+   private static final Method INSTANT_NOW = instantMethod("now");
  
--  @Nullable private static final Method INSTANT_GET_EPOCH_SECOND = instantMethod("getEpochSecond");
-+  private static final Method INSTANT_GET_EPOCH_SECOND = instantMethod("getEpochSecond");
+-  @Nullable
+   private static final Method INSTANT_GET_EPOCH_SECOND = instantMethod("getEpochSecond");
  
--  @Nullable private static final Method INSTANT_GET_NANO = instantMethod("getNano");
-+  private static final Method INSTANT_GET_NANO = instantMethod("getNano");
+-  @Nullable
+   private static final Method INSTANT_GET_NANO = instantMethod("getNano");
  
 -  @Nullable
    private static Method instantMethod(String methodName) {

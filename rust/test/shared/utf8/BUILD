@@ -1,3 +1,4 @@
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@rules_rust//rust:defs.bzl", "rust_test")
 load("//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("//bazel:proto_library.bzl", "proto_library")
@@ -11,6 +12,7 @@ rust_test(
     aliases = {
         "//rust:protobuf_cpp_export": "protobuf",
     },
+    edition = "2024",
     deps = [
         ":feature_verify_cpp_rust_proto",
         ":no_features_proto2_cpp_rust_proto",
@@ -26,6 +28,7 @@ rust_test(
     aliases = {
         "//rust:protobuf_upb_export": "protobuf",
     },
+    edition = "2024",
     deps = [
         ":feature_verify_upb_rust_proto",
         ":no_features_proto2_upb_rust_proto",

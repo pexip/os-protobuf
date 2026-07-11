@@ -1,0 +1,30 @@
+Description: build with system utf8-range library
+ Look for the library in system locations.
+Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
+Forwarded: not-needed
+Last-Update: 2026-06-23
+
+---
+
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -274,7 +274,7 @@ endif (protobuf_BUILD_TESTS)
+ include(${protobuf_SOURCE_DIR}/cmake/abseil-cpp.cmake)
+ 
+ if (protobuf_BUILD_PROTOBUF_BINARIES)
+-  include(${protobuf_SOURCE_DIR}/cmake/utf8_range.cmake)
++  find_package(utf8_range REQUIRED)
+   include(${protobuf_SOURCE_DIR}/cmake/libprotobuf-lite.cmake)
+   if (NOT DEFINED protobuf_LIB_PROTOBUF_LITE)
+     set(protobuf_LIB_PROTOBUF_LITE libprotobuf-lite)
+--- a/third_party/utf8_range/CMakeLists.txt
++++ b/third_party/utf8_range/CMakeLists.txt
+@@ -7,7 +7,7 @@ if (POLICY CMP0077)
+ endif (POLICY CMP0077)
+ 
+ option (utf8_range_ENABLE_TESTS "Build test suite" ON)
+-option (utf8_range_ENABLE_INSTALL "Configure installation" ON)
++option (utf8_range_ENABLE_INSTALL "Configure installation" OFF)
+ 
+ ##
+ # Create the lightweight C library

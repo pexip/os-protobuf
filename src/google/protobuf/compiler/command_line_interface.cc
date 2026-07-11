@@ -28,6 +28,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include "google/protobuf/compiler/plugin.h"
 #ifdef major
 #undef major
 #endif
@@ -66,6 +68,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
+#include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "google/protobuf/compiler/code_generator.h"
 #include "google/protobuf/compiler/importer.h"
@@ -121,19 +124,29 @@ using google::protobuf::io::win32::setmode;
 using google::protobuf::io::win32::write;
 #endif
 
-static const char* kDefaultDirectDependenciesViolationMsg =
+constexpr absl::string_view kDefaultDirectDependenciesViolationMsg =
     "File is imported but not declared in --direct_dependencies: %s";
 
-// Returns true if the text looks like a Windows-style absolute path, starting
-// with a drive letter.  Example:  "C:\foo".  TODO:  Share this with
-// copy in importer.cc?
-static bool IsWindowsAbsolutePath(const std::string& text) {
-#if defined(_WIN32) || defined(__CYGWIN__)
+constexpr absl::string_view kDefaultOptionDependenciesViolationMsg =
+    "File is option imported but not declared in --option_dependencies: %s";
+
+// Returns true if the text begins with a Windows-style absolute path, starting
+// with a drive letter.  Example:  "C:\foo".
+static bool StartsWithWindowsAbsolutePath(absl::string_view text) {
+#if defined(_WIN32) || defined(__CYGWIN__) || defined(__MSYS__) || \
+    defined(__MSYS2__)
   return text.size() >= 3 && text[1] == ':' && absl::ascii_isalpha(text[0]) &&
-         (text[2] == '/' || text[2] == '\\') && text.find_last_of(':') == 1;
+         (text[2] == '/' || text[2] == '\\');
 #else
   return false;
 #endif
+}
+
+// Returns true if the text looks like a single Windows-style absolute path,
+// starting with a drive letter.  Example:  "C:\foo".  TODO:  Share this
+// with copy in importer.cc?
+static bool IsWindowsAbsolutePath(absl::string_view text) {
+  return StartsWithWindowsAbsolutePath(text) && text.find_last_of(':') == 1;
 }
 
 void SetFdToTextMode(int fd) {
@@ -287,10 +300,12 @@ void AddDefaultProtoPaths(
 
 std::string PluginName(absl::string_view plugin_prefix,
                        absl::string_view directive) {
-  // Assuming the directive starts with "--" and ends with "_out" or "_opt",
-  // strip the "--" and "_out/_opt" and add the plugin prefix.
+  // Assuming the directive starts with "--" and ends with one of "_out",
+  // "_opt", or "_prefix", strip the "--" and the trailing "_..." segment and
+  // add the plugin prefix.
+  size_t suffix_start = directive.find_last_of('_');
   return absl::StrCat(plugin_prefix, "gen-",
-                      directive.substr(2, directive.size() - 6));
+                      directive.substr(2, suffix_start - 2));
 }
 
 bool GetBootstrapParam(const std::string& parameter) {
@@ -310,7 +325,7 @@ void CommandLineInterface::GetTransitiveDependencies(
     const FileDescriptor* file,
     absl::flat_hash_set<const FileDescriptor*>* already_seen,
     RepeatedPtrField<FileDescriptorProto>* output,
-    const TransitiveDependencyOptions& options) {
+    const TransitiveDependencyOptions& options) const {
   if (!already_seen->insert(file).second) {
     // Already saw this file.  Skip.
     return;
@@ -320,6 +335,16 @@ void CommandLineInterface::GetTransitiveDependencies(
   for (int i = 0; i < file->dependency_count(); ++i) {
     GetTransitiveDependencies(file->dependency(i), already_seen, output,
                               options);
+  }
+  for (int i = 0; i < file->option_dependency_count(); ++i) {
+    const FileDescriptor* dep =
+        file->pool()->FindFileByName(file->option_dependency_name(i));
+    ABSL_CHECK(dep != nullptr || !descriptor_set_in_names_.empty())
+        << "Option dependency " << file->option_dependency_name(i)
+        << " not found in pool.  This should never happen.";
+    if (dep != nullptr) {
+      GetTransitiveDependencies(dep, already_seen, output, options);
+    }
   }
 
   // Add this file.
@@ -439,11 +464,11 @@ class CommandLineInterface::GeneratorContextImpl : public GeneratorContext {
 
   // Write all files in the directory to disk at the given output location,
   // which must end in a '/'.
-  bool WriteAllToDisk(const std::string& prefix);
+  bool WriteAllToDisk(const std::string& prefix, bool allow_escape = false);
 
   // Write the contents of this directory to a ZIP-format archive with the
   // given name.
-  bool WriteAllToZip(const std::string& filename);
+  bool WriteAllToZip(const std::string& filename, bool allow_escape = false);
 
   // Add a boilerplate META-INF/MANIFEST.MF file as required by the Java JAR
   // format, unless one has already been written.
@@ -539,7 +564,7 @@ CommandLineInterface::GeneratorContextImpl::GeneratorContextImpl(
     : parsed_files_(parsed_files), had_error_(false) {}
 
 bool CommandLineInterface::GeneratorContextImpl::WriteAllToDisk(
-    const std::string& prefix) {
+    const std::string& prefix, bool allow_escape) {
   if (had_error_) {
     return false;
   }
@@ -552,6 +577,15 @@ bool CommandLineInterface::GeneratorContextImpl::WriteAllToDisk(
     const std::string& relative_filename = pair.first;
     const char* data = pair.second.data();
     int size = pair.second.size();
+
+    if (!allow_escape && absl::StrContains(relative_filename, "..")) {
+      std::cerr << "Output file names must never have a relative path."
+                << " (" << relative_filename << "). "
+                << "Use --unsafe_allow_out_dir_escape to disable this error if "
+                   "intentional."
+                << std::endl;
+      return false;
+    }
 
     if (!TryCreateParentDirectory(prefix, relative_filename)) {
       return false;
@@ -613,7 +647,7 @@ bool CommandLineInterface::GeneratorContextImpl::WriteAllToDisk(
 }
 
 bool CommandLineInterface::GeneratorContextImpl::WriteAllToZip(
-    const std::string& filename) {
+    const std::string& filename, bool allow_escape) {
   if (had_error_) {
     return false;
   }
@@ -636,6 +670,13 @@ bool CommandLineInterface::GeneratorContextImpl::WriteAllToZip(
   ZipWriter zip_writer(&stream);
 
   for (const auto& pair : files_) {
+    if (!allow_escape && absl::StrContains(pair.first, "..")) {
+      std::cerr << "WARNING: Output file names must never have a relative "
+                << "path. (" << pair.first << "). "
+                << "This will become an error in a future breaking change "
+                << "release of Protobuf. Use --unsafe_allow_out_dir_escape "
+                << "to suppress this warning if intentional." << std::endl;
+    }
     zip_writer.Write(pair.first, pair.second);
   }
 
@@ -821,9 +862,9 @@ void CommandLineInterface::MemoryOutputStream::UpdateMetadata(
                       new_metadata);
   }
   if (is_text_format) {
-    TextFormat::PrintToString(new_metadata, encoded_data);
+    ABSL_CHECK(TextFormat::PrintToString(new_metadata, encoded_data));
   } else {
-    new_metadata.SerializeToString(encoded_data);
+    ABSL_CHECK(new_metadata.SerializeToString(encoded_data));
   }
 }
 
@@ -951,7 +992,9 @@ const char* const CommandLineInterface::kPathSeparator = ":";
 
 CommandLineInterface::CommandLineInterface()
     : direct_dependencies_violation_msg_(
-          kDefaultDirectDependenciesViolationMsg) {}
+          kDefaultDirectDependenciesViolationMsg),
+      option_dependencies_violation_msg_(
+          kDefaultOptionDependenciesViolationMsg) {}
 
 CommandLineInterface::~CommandLineInterface() = default;
 
@@ -1015,6 +1058,98 @@ bool HasReservedFieldNumber(const FieldDescriptor* field) {
     return true;
   }
   return false;
+}
+
+bool HasDebugRedactBehavior(const EnumDescriptor& enm) {
+  for (int i = 0; i < enm.value_count(); ++i) {
+    const EnumValueDescriptor* value = enm.value(i);
+    if (value->options().debug_redact()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool HasDebugRedactBehavior(
+    const Descriptor& desc,
+    absl::flat_hash_map<const Descriptor*, bool>& visited);
+
+bool HasDebugRedactBehavior(
+    const FieldDescriptor& field,
+    absl::flat_hash_map<const Descriptor*, bool>& visited) {
+  // We do not check field.options().debug_redact() here because that only
+  // controls redaction of that specific field.  The problematic case is enum
+  // values, which can turn *other* custom options into redaction markers.
+  if (field.enum_type() != nullptr &&
+      HasDebugRedactBehavior(*field.enum_type())) {
+    return true;
+  }
+  if (field.message_type() != nullptr &&
+      HasDebugRedactBehavior(*field.message_type(), visited)) {
+    return true;
+  }
+  return false;
+}
+
+bool HasDebugRedactBehavior(
+    const Descriptor& desc,
+    absl::flat_hash_map<const Descriptor*, bool>& visited) {
+  auto result = visited.emplace(&desc, false);
+  if (!result.second) {
+    return result.first->second;
+  }
+  for (int i = 0; i < desc.field_count(); ++i) {
+    if (HasDebugRedactBehavior(*desc.field(i), visited)) {
+      visited[&desc] = true;
+      return true;
+    }
+  }
+  return false;
+}
+
+// Look for any enums with values marked debug_redact within this message
+// schema.  These can be used to mark fields that need to be redacted in debug
+// string APIs, but are only discoverable via reflection that doesn't force
+// linkage.
+absl::optional<std::string> FindDebugRedactMarker(const FileDescriptor& desc) {
+  absl::optional<std::string> debug_redact_value;
+  absl::flat_hash_map<const Descriptor*, bool> visited;
+  google::protobuf::internal::VisitDescriptors(
+      desc, [&debug_redact_value, &visited](const FieldDescriptor& field) {
+        if (field.is_extension() && HasDebugRedactBehavior(field, visited)) {
+          debug_redact_value = std::string(field.full_name());
+        }
+      });
+  return debug_redact_value;
+}
+
+bool ValidateOptionImports(const FileDescriptor& file,
+                           const DescriptorPool& pool,
+                           DescriptorPool::ErrorCollector* printer) {
+  for (int i = 0; i < file.option_dependency_count(); ++i) {
+    const FileDescriptor* dep =
+        pool.FindFileByName(file.option_dependency_name(i));
+    if (dep == nullptr) {
+      // If we don't have the dependency we can't validate it, assume it's ok.
+      continue;
+    }
+    absl::optional<std::string> debug_redact_value =
+        FindDebugRedactMarker(*dep);
+    if (debug_redact_value.has_value()) {
+      printer->RecordError(
+          file.name(), "", nullptr, DescriptorPool::ErrorCollector::OPTION_NAME,
+          absl::StrCat(
+              "Option dependency ", dep->name(), " contains a custom option ",
+              *debug_redact_value,
+              " marked debug_redact, which is used to mark fields that need to "
+              "be redacted in debug string APIs. Switch to a regular import or "
+              "remove the debug_redact annotation to avoid potentially leaking "
+              "sensitive data."));
+      return false;
+    }
+  }
+
+  return true;
 }
 
 }  // namespace
@@ -1248,8 +1383,10 @@ int CommandLineInterface::Run(int argc, const char* const argv[]) {
   }
 
   descriptor_pool->EnforceWeakDependencies(true);
-  descriptor_pool->EnforceOptionDependencies(true);
+  descriptor_pool->EnforceSymbolVisibility(true);
   descriptor_pool->EnforceNamingStyle(true);
+  descriptor_pool->EnforceProtoLimits(true);
+  descriptor_pool->EnforceFeatureSupportValidation(true);
 
   if (!SetupFeatureResolution(*descriptor_pool)) {
     return EXIT_FAILURE;
@@ -1271,6 +1408,25 @@ int CommandLineInterface::Run(int argc, const char* const argv[]) {
   bool validation_error = false;  // Defer exiting so we log more warnings.
 
   for (auto& file : parsed_files) {
+    if (!ValidateOptionImports(*file, *descriptor_pool,
+                               error_collector.get())) {
+      validation_error = true;
+    }
+
+    if (file->options().cc_generic_services() ||
+        file->options().java_generic_services() ||
+        file->options().py_generic_services()) {
+      error_collector->RecordWarning(
+          file->name(), "options", nullptr,
+          DescriptorPool::ErrorCollector::OPTION_VALUE,
+          "Generic services (cc_generic_services, java_generic_services, and "
+          "py_generic_services) are deprecated in favor of using plugins that "
+          "generate code specific to your particular RPC system. Additional "
+          "code generator options may be required to enable generic services "
+          "and total removal of these options is planned in future breaking "
+          "releases.");
+    }
+
     google::protobuf::internal::VisitDescriptors(
         *file, [&](const FieldDescriptor& field) {
           if (HasReservedFieldNumber(&field)) {
@@ -1358,7 +1514,7 @@ int CommandLineInterface::Run(int argc, const char* const argv[]) {
     const std::string& location = pair.first;
     GeneratorContextImpl* directory = pair.second.get();
     if (absl::EndsWith(location, "/")) {
-      if (!directory->WriteAllToDisk(location)) {
+      if (!directory->WriteAllToDisk(location, unsafe_allow_out_dir_escape_)) {
         return 1;
       }
     } else {
@@ -1366,7 +1522,7 @@ int CommandLineInterface::Run(int argc, const char* const argv[]) {
         directory->AddJarManifest();
       }
 
-      if (!directory->WriteAllToZip(location)) {
+      if (!directory->WriteAllToZip(location, unsafe_allow_out_dir_escape_)) {
         return 1;
       }
     }
@@ -1480,8 +1636,8 @@ PopulateSingleSimpleDescriptorDatabase(const std::string& descriptor_set_name) {
     return nullptr;
   }
 
-  std::unique_ptr<SimpleDescriptorDatabase> database{
-      new SimpleDescriptorDatabase()};
+  std::unique_ptr<SimpleDescriptorDatabase> database =
+      std::make_unique<SimpleDescriptorDatabase>();
 
   for (int j = 0; j < file_descriptor_set.file_size(); j++) {
     FileDescriptorProto previously_added_file_descriptor_proto;
@@ -1541,11 +1697,11 @@ bool CommandLineInterface::SetupFeatureResolution(DescriptorPool& pool) {
                         << ProtocMinimumEdition() << ".";
         return false;
       }
-      if (output.generator->GetMaximumEdition() != ProtocMaximumEdition()) {
+      if (output.generator->GetMaximumEdition() > ProtocMaximumEdition()) {
         ABSL_LOG(ERROR) << "Built-in generator " << output.name
                         << " specifies a maximum edition "
                         << output.generator->GetMaximumEdition()
-                        << " which is not the protoc maximum "
+                        << " which is later than the protoc maximum "
                         << ProtocMaximumEdition() << ".";
         return false;
       }
@@ -1638,6 +1794,26 @@ bool CommandLineInterface::ParseInputFiles(
         break;
       }
     }
+
+    // Enforce --option_dependencies.
+    if (option_dependencies_explicitly_set_) {
+      bool indirect_option_imports = false;
+      for (int i = 0; i < parsed_file->option_dependency_count(); ++i) {
+        if (option_dependencies_.find(parsed_file->option_dependency_name(i)) ==
+            option_dependencies_.end()) {
+          indirect_option_imports = true;
+          std::cerr << parsed_file->name() << ": "
+                    << absl::StrReplaceAll(
+                           option_dependencies_violation_msg_,
+                           {{"%s", parsed_file->option_dependency_name(i)}})
+                    << std::endl;
+        }
+      }
+      if (indirect_option_imports) {
+        result = false;
+        break;
+      }
+    }
   }
   descriptor_pool->ClearDirectInputFiles();
   return result;
@@ -1650,7 +1826,11 @@ void CommandLineInterface::Clear() {
   proto_path_.clear();
   input_files_.clear();
   direct_dependencies_.clear();
-  direct_dependencies_violation_msg_ = kDefaultDirectDependenciesViolationMsg;
+  direct_dependencies_violation_msg_ =
+      std::string(kDefaultDirectDependenciesViolationMsg);
+  option_dependencies_.clear();
+  option_dependencies_violation_msg_ =
+      std::string(kDefaultOptionDependenciesViolationMsg);
   output_directives_.clear();
   codec_type_.clear();
   descriptor_set_in_names_.clear();
@@ -1762,7 +1942,7 @@ bool CommandLineInterface::MakeInputsBeProtoPathRelative(
 bool CommandLineInterface::ExpandArgumentFile(
     const char* file, std::vector<std::string>* arguments) {
 // On windows to force ifstream to handle proper utr-8, we need to convert to
-// proper supported utf8 wstring. If we dont then the file can't be opened.
+// proper supported utf8 wstring. If we don't then the file can't be opened.
 #ifdef _MSC_VER
   // Convert the file name to wide chars.
   int size = MultiByteToWideChar(CP_UTF8, 0, file, strlen(file), nullptr, 0);
@@ -2007,7 +2187,8 @@ bool CommandLineInterface::ParseArgument(const char* arg, std::string* name,
       *name == "--experimental_editions" ||
       *name == "--print_free_field_numbers" ||
       *name == "--experimental_allow_proto3_optional" ||
-      *name == "--deterministic_output" || *name == "--fatal_warnings") {
+      *name == "--deterministic_output" ||
+      *name == "--unsafe_allow_out_dir_escape" || *name == "--fatal_warnings") {
     // HACK:  These are the only flags that don't take a value.
     //   They probably should not be hard-coded like this but for now it's
     //   not worth doing better.
@@ -2062,12 +2243,17 @@ CommandLineInterface::InterpretArgument(const std::string& name,
 #endif  // _WIN32
 
   } else if (name == "-I" || name == "--proto_path") {
+    // If we have something that starts with a Windows absolute path,
+    // then the only path separator that makes sense is the semicolon.
+    const char* separator = StartsWithWindowsAbsolutePath(value)
+                                ? ";"
+                                : CommandLineInterface::kPathSeparator;
+
     // Java's -classpath (and some other languages) delimits path components
     // with colons.  Let's accept that syntax too just to make things more
     // intuitive.
-    std::vector<std::string> parts = absl::StrSplit(
-        value, absl::ByAnyChar(CommandLineInterface::kPathSeparator),
-        absl::SkipEmpty());
+    std::vector<std::string> parts =
+        absl::StrSplit(value, absl::ByAnyChar(separator), absl::SkipEmpty());
 
     for (size_t i = 0; i < parts.size(); ++i) {
       std::string virtual_path;
@@ -2127,7 +2313,23 @@ CommandLineInterface::InterpretArgument(const std::string& name,
 
   } else if (name == "--direct_dependencies_violation_msg") {
     direct_dependencies_violation_msg_ = value;
+  } else if (name == "--option_dependencies") {
+    if (option_dependencies_explicitly_set_) {
+      std::cerr << name
+                << " may only be passed once. To specify multiple "
+                   "option dependencies, pass them all as a single "
+                   "parameter separated by ':'."
+                << std::endl;
+      return PARSE_ARGUMENT_FAIL;
+    }
 
+    option_dependencies_explicitly_set_ = true;
+    std::vector<std::string> direct =
+        absl::StrSplit(value, ':', absl::SkipEmpty());
+    ABSL_DCHECK(option_dependencies_.empty());
+    option_dependencies_.insert(direct.begin(), direct.end());
+  } else if (name == "--option_dependencies_violation_msg") {
+    option_dependencies_violation_msg_ = value;
   } else if (name == "--descriptor_set_in") {
     if (!descriptor_set_in_names_.empty()) {
       std::cerr << name
@@ -2222,6 +2424,8 @@ CommandLineInterface::InterpretArgument(const std::string& name,
 
   } else if (name == "--disallow_services") {
     disallow_services_ = true;
+  } else if (name == "--unsafe_allow_out_dir_escape") {
+    unsafe_allow_out_dir_escape_ = true;
   } else if (name == "--experimental_allow_proto3_optional") {
     // Flag is no longer observed, but we allow it for backward compat.
   } else if (name == "--encode" || name == "--decode" ||
@@ -2398,6 +2602,28 @@ CommandLineInterface::InterpretArgument(const std::string& name,
           parameters->append(",");
         }
         parameters->append(value);
+      } else if (absl::StartsWith(name, "--") &&
+                 absl::EndsWith(name, "_prefix")) {
+        std::string plugin_name = PluginName(plugin_prefix_, name);
+        if (plugin_command_prefixes_.find(plugin_name) !=
+            plugin_command_prefixes_.end()) {
+          std::cerr << name << " may only be passed once." << std::endl;
+          return PARSE_ARGUMENT_FAIL;
+        }
+        if (value.find_first_of("\"'") != std::string::npos) {
+          std::cerr << name
+                    << ": quotes are not supported in the value. Use a "
+                       "wrapper script for more complex invocations."
+                    << std::endl;
+          return PARSE_ARGUMENT_FAIL;
+        }
+        std::vector<std::string> tokens = absl::StrSplit(
+            value, absl::ByAnyChar(" \t"), absl::SkipWhitespace());
+        if (tokens.empty()) {
+          std::cerr << name << " requires a non-empty value." << std::endl;
+          return PARSE_ARGUMENT_FAIL;
+        }
+        plugin_command_prefixes_[plugin_name] = std::move(tokens);
       } else {
         std::cerr << "Unknown flag: " << name << std::endl;
         return PARSE_ARGUMENT_FAIL;
@@ -2459,6 +2685,9 @@ Parse PROTO_FILES and generate output based on the options given:
                               deterministically ordered. Note that this order
                               is not canonical, and changes across builds or
                               releases of protoc.
+  --unsafe_allow_out_dir_escape
+                              Allow output files to use ".." to escape the
+                              output directory. Use with caution.
   --decode=MESSAGE_TYPE       Read a binary message of the given type from
                               standard input and write it in text format
                               to standard output.  The message type must
@@ -2508,7 +2737,13 @@ Parse PROTO_FILES and generate output based on the options given:
                               are counted as occupied fields numbers.
   --enable_codegen_trace      Enables tracing which parts of protoc are
                               responsible for what codegen output. Not supported
-                              by all backends or on all platforms.)";
+                              by all backends or on all platforms.
+  --direct_dependencies       A colon delimited list of imports that are
+                              allowed to be used in "import"
+                              declarations, when explictily provided.
+  --option_dependencies       A colon delimited list of imports that are
+                              allowed to be used in "import option"
+                              declarations, when explicitly provided.)";
   std::cout << R"(
   --notices                   Show notice file and exit.)";
   if (!plugin_prefix_.empty()) {
@@ -2520,7 +2755,15 @@ Parse PROTO_FILES and generate output based on the options given:
                               Additionally, EXECUTABLE may be of the form
                               NAME=PATH, in which case the given plugin name
                               is mapped to the given executable even if
-                              the executable's own name differs.)";
+                              the executable's own name differs.
+  --<lang>_prefix=COMMAND     Runs the plugin used by --<lang>_out via
+                              COMMAND. protoc executes "COMMAND <plugin>"
+                              instead of invoking the plugin binary directly.
+                              COMMAND's first token is resolved via the
+                              search path (PATH). The value is split into
+                              argv tokens on whitespace; quotes are not
+                              supported. Use a wrapper script for more
+                              complex invocations.)";
   }
 
   for (const auto& kv : generators_by_flag_name_) {
@@ -2633,9 +2876,11 @@ bool CommandLineInterface::EnforceProtocEditionsSupport(
 
     if (edition > ProtocMaximumEdition()) {
       std::cerr << absl::Substitute(
-          "$0: is a file using edition $1, which is later than the protoc "
-          "maximum supported edition $2.",
-          fd->name(), edition, ProtocMaximumEdition());
+                       "$0: is a file using edition $1, which is later than "
+                       "the protoc "
+                       "maximum supported edition $2.",
+                       fd->name(), edition, ProtocMaximumEdition())
+                << std::endl;
       return false;
     }
   }
@@ -2669,30 +2914,8 @@ bool CommandLineInterface::GenerateOutput(
     }
   } else {
     // Regular generator.
-    std::string parameters = output_directive.parameter;
-    if (!generator_parameters_[output_directive.name].empty()) {
-      if (!parameters.empty()) {
-        parameters.append(",");
-      }
-      parameters.append(generator_parameters_[output_directive.name]);
-    }
-    if (!EnforceProto3OptionalSupport(
-            output_directive.name,
-            output_directive.generator->GetSupportedFeatures(), parsed_files)) {
-      return false;
-    }
-
-    if (!EnforceEditionsSupport(
-            output_directive.name,
-            output_directive.generator->GetSupportedFeatures(),
-            output_directive.generator->GetMinimumEdition(),
-            output_directive.generator->GetMaximumEdition(), parsed_files)) {
-      return false;
-    }
-
-    if (!output_directive.generator->GenerateAll(parsed_files, parameters,
-                                                 generator_context, &error)) {
-      // Generator returned an error.
+    if (!GenerateBuiltInOutput(parsed_files, output_directive,
+                               generator_context, &error)) {
       std::cerr << output_directive.name << ": " << error << std::endl;
       return false;
     }
@@ -2782,21 +3005,15 @@ bool CommandLineInterface::GenerateDependencyManifestFile(
   return true;
 }
 
-bool CommandLineInterface::GeneratePluginOutput(
-    const std::vector<const FileDescriptor*>& parsed_files,
-    const std::string& plugin_name, const std::string& parameter,
-    GeneratorContext* generator_context, std::string* error) {
+CodeGeneratorRequest CommandLineInterface::CreateCodeGeneratorRequest(
+    std::vector<const FileDescriptor*> parsed_files, std::string parameter,
+    bool copy_json_name, bool bootstrap) const {
   CodeGeneratorRequest request;
-  CodeGeneratorResponse response;
-  std::string processed_parameter = parameter;
-
-  bool bootstrap = GetBootstrapParam(processed_parameter);
 
   // Build the request.
-  if (!processed_parameter.empty()) {
-    request.set_parameter(processed_parameter);
+  if (!parameter.empty()) {
+    request.set_parameter(parameter);
   }
-
 
   absl::flat_hash_set<const FileDescriptor*> already_seen;
   for (const FileDescriptor* file : parsed_files) {
@@ -2813,9 +3030,6 @@ bool CommandLineInterface::GeneratePluginOutput(
   const DescriptorPool* pool = parsed_files[0]->pool();
   absl::flat_hash_set<std::string> files_to_generate(input_files_.begin(),
                                                      input_files_.end());
-  static const auto builtin_plugins = new absl::flat_hash_set<std::string>(
-      {"protoc-gen-cpp", "protoc-gen-java", "protoc-gen-mutable_java",
-       "protoc-gen-python"});
   for (FileDescriptorProto& file_proto : *request.mutable_proto_file()) {
     if (files_to_generate.contains(file_proto.name())) {
       const FileDescriptor* file = pool->FindFileByName(file_proto.name());
@@ -2825,8 +3039,7 @@ bool CommandLineInterface::GeneratePluginOutput(
       if (!bootstrap) {
         file->CopySourceCodeInfoTo(&file_proto);
 
-        // The built-in code generators didn't use the json names.
-        if (!builtin_plugins->contains(plugin_name)) {
+        if (copy_json_name) {
           file->CopyJsonNameTo(&file_proto);
         }
       }
@@ -2841,21 +3054,12 @@ bool CommandLineInterface::GeneratePluginOutput(
   version->set_patch(PROTOBUF_VERSION % 1000);
   version->set_suffix(PROTOBUF_VERSION_SUFFIX);
 
-  // Invoke the plugin.
-  Subprocess subprocess;
+  return request;
+}
 
-  if (plugins_.count(plugin_name) > 0) {
-    subprocess.Start(plugins_[plugin_name], Subprocess::EXACT_NAME);
-  } else {
-    subprocess.Start(plugin_name, Subprocess::SEARCH_PATH);
-  }
-
-  std::string communicate_error;
-  if (!subprocess.Communicate(request, &response, &communicate_error)) {
-    *error = absl::Substitute("$0: $1", plugin_name, communicate_error);
-    return false;
-  }
-
+bool CommandLineInterface::GenerateCodeFromResponse(
+    const CodeGeneratorResponse& response, GeneratorContext* generator_context,
+    bool bootstrap, std::string plugin_name, std::string* error) {
   // Write the files.  We do this even if there was a generator error in order
   // to match the behavior of a compiled-in generator.
   std::unique_ptr<io::ZeroCopyOutputStream> current_output;
@@ -2886,10 +3090,74 @@ bool CommandLineInterface::GeneratePluginOutput(
       return false;
     }
 
+    // This is only reachable for generators that are statically linked into
+    // protoc. For subprocess plugins, their responses go through wire-format
+    // parsing which already rejects payloads > 2 GiB.
+    if (output_file.content().size() > INT_MAX) {
+      *error = absl::Substitute(
+          "$0: Generated file $1 is too large (exceeds 2 GiB limit).",
+          plugin_name, output_file.name());
+      return false;
+    }
+
     // Use CodedOutputStream for convenience; otherwise we'd need to provide
     // our own buffer-copying loop.
     io::CodedOutputStream writer(current_output.get());
     writer.WriteString(output_file.content());
+  }
+
+  return true;
+}
+
+bool CommandLineInterface::GeneratePluginOutput(
+    const std::vector<const FileDescriptor*>& parsed_files,
+    const std::string& plugin_name, const std::string& parameter,
+    GeneratorContext* generator_context, std::string* error) {
+  // TODO Remove these special-cases and send json names to all
+  // plugins.
+  static const auto builtin_plugins = new absl::flat_hash_set<std::string>(
+      {"protoc-gen-cpp", "protoc-gen-java", "protoc-gen-mutable_java",
+       "protoc-gen-python"});
+
+  bool bootstrap = GetBootstrapParam(parameter);
+  CodeGeneratorRequest request = CreateCodeGeneratorRequest(
+      parsed_files, parameter,
+      // The built-in code generators didn't use the json names.
+      /*copy_json_name=*/!builtin_plugins->contains(plugin_name), bootstrap);
+  CodeGeneratorResponse response;
+
+  // Invoke the plugin.
+  Subprocess subprocess;
+
+  const auto plugin_it = plugins_.find(plugin_name);
+  const bool has_registered_path = plugin_it != plugins_.end();
+  const std::string executable =
+      has_registered_path ? plugin_it->second : plugin_name;
+
+  const auto prefix_it = plugin_command_prefixes_.find(plugin_name);
+  if (prefix_it == plugin_command_prefixes_.end()) {
+    subprocess.Start(executable, has_registered_path ? Subprocess::EXACT_NAME
+                                                     : Subprocess::SEARCH_PATH);
+  } else {
+    // When a prefix is provided, we always execute the prefix first and pass
+    // the plugin executable as an argument. If a custom path was registered, we
+    // pass that path so the prefix does not need to search for the binary.
+    const std::vector<std::string>& prefix_tokens = prefix_it->second;
+    std::vector<std::string> args(prefix_tokens.begin() + 1,
+                                  prefix_tokens.end());
+    args.push_back(executable);
+    subprocess.Start(prefix_tokens.front(), Subprocess::SEARCH_PATH, args);
+  }
+
+  std::string communicate_error;
+  if (!subprocess.Communicate(request, &response, &communicate_error)) {
+    *error = absl::Substitute("$0: $1", plugin_name, communicate_error);
+    return false;
+  }
+
+  if (!GenerateCodeFromResponse(response, generator_context, bootstrap,
+                                plugin_name, error)) {
+    return false;
   }
 
   // Check for errors.
@@ -2911,6 +3179,51 @@ bool CommandLineInterface::GeneratePluginOutput(
   }
 
   return success;
+}
+
+bool CommandLineInterface::GenerateBuiltInOutput(
+    const std::vector<const FileDescriptor*>& parsed_files,
+    const OutputDirective& output_directive,
+    GeneratorContext* generator_context, std::string* error) {
+  std::string parameters = output_directive.parameter;
+  if (!generator_parameters_[output_directive.name].empty()) {
+    if (!parameters.empty()) {
+      parameters.append(",");
+    }
+    parameters.append(generator_parameters_[output_directive.name]);
+  }
+  if (!EnforceProto3OptionalSupport(
+          output_directive.name,
+          output_directive.generator->GetSupportedFeatures(), parsed_files)) {
+    return false;
+  }
+
+  if (!EnforceEditionsSupport(
+          output_directive.name,
+          output_directive.generator->GetSupportedFeatures(),
+          output_directive.generator->GetMinimumEdition(),
+          output_directive.generator->GetMaximumEdition(), parsed_files)) {
+    return false;
+  }
+
+  CodeGeneratorRequest request =
+      CreateCodeGeneratorRequest(parsed_files, parameters);
+  CodeGeneratorResponse response;
+  if (!GenerateCode(request, *output_directive.generator, &response, error)) {
+    return false;
+  }
+  if (response.has_error()) {
+    *error = response.error();
+    return false;
+  }
+
+  if (!GenerateCodeFromResponse(response, generator_context,
+                                /*bootstrap=*/false, output_directive.name,
+                                error)) {
+    return false;
+  }
+
+  return true;
 }
 
 bool CommandLineInterface::EncodeOrDecode(const DescriptorPool* pool) {
@@ -2996,6 +3309,15 @@ bool CommandLineInterface::WriteDescriptorSet(
         const FileDescriptor* dependency = file->dependency(j);
         // if the dependency isn't in parsed files, mark it as already seen
         if (to_output.find(dependency) == to_output.end()) {
+          already_seen.insert(dependency);
+        }
+      }
+      for (int j = 0; j < file->option_dependency_count(); j++) {
+        const FileDescriptor* dependency =
+            file->pool()->FindFileByName(file->option_dependency_name(j));
+        // if the dependency isn't in parsed files, mark it as already seen
+        if (dependency != nullptr &&
+            to_output.find(dependency) == to_output.end()) {
           already_seen.insert(dependency);
         }
       }
