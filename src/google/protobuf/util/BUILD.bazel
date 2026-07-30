@@ -135,19 +135,49 @@ cc_library(
 cc_test(
     name = "field_mask_util_test",
     srcs = ["field_mask_util_test.cc"],
-    copts = COPTS,
+    copts = COPTS + select({
+        "//build_defs:config_msvc": [],
+        "//conditions:default": [
+            "-Wno-deprecated-declarations",
+        ],
+    }),
     deps = [
         ":field_mask_util",
+        ":field_mask_util_test_cc_proto",
         "//src/google/protobuf",
         "//src/google/protobuf:cc_test_protos",
         "//src/google/protobuf:field_mask_cc_proto",
+        "//src/google/protobuf:test_textproto",
         "//src/google/protobuf:test_util",
         "//src/google/protobuf/stubs",
         "//src/google/protobuf/testing",
         "//src/google/protobuf/testing:file",
+        "@abseil-cpp//absl/base:log_severity",
+        "@abseil-cpp//absl/strings:string_view",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
+)
+
+proto_library(
+    name = "field_mask_util_test_proto",
+    testonly = 1,
+    srcs = ["field_mask_util_test.proto"],
+    strip_import_prefix = "/src",
+)
+
+cc_proto_library(
+    name = "field_mask_util_test_cc_proto",
+    testonly = 1,
+    deps = [":field_mask_util_test_proto"],
+)
+
+cc_library(
+    name = "internal_timeval",
+    hdrs = ["internal_timeval.h"],
+    copts = COPTS,
+    strip_include_prefix = "/src",
+    visibility = ["//:__subpackages__"],
 )
 
 cc_library(
@@ -169,6 +199,7 @@ cc_library(
         "//visibility:public",
     ],
     deps = [
+        ":internal_timeval",
         "//src/google/protobuf",
         "//src/google/protobuf:duration_cc_proto",
         "//src/google/protobuf:port",
@@ -186,6 +217,7 @@ cc_test(
     name = "time_util_test",
     srcs = ["time_util_test.cc"],
     deps = [
+        ":internal_timeval",
         ":time_util",
         "//src/google/protobuf",
         "//src/google/protobuf:duration_cc_proto",
@@ -256,6 +288,7 @@ filegroup(
     name = "test_proto_srcs",
     testonly = 1,
     srcs = [
+        "field_mask_util_test.proto",
         "json_format.proto",
         "json_format_proto3.proto",
         "message_differencer_unittest.proto",

@@ -31,6 +31,9 @@
 
 namespace google {
 namespace protobuf {
+
+class Arena;
+
 namespace internal {
 
 // This class provides the core Arena memory allocation library. Different
@@ -114,6 +117,8 @@ class PROTOBUF_EXPORT ThreadSafeArena {
   friend class cleanup::ChunkList;
   static uint64_t GetNextLifeCycleId();
 
+  friend SerialArena* GetSerialArena(Arena*);
+
   class SerialArenaChunk;
 
   // Returns a new SerialArenaChunk that has {id, serial} at slot 0. It may
@@ -141,17 +146,20 @@ class PROTOBUF_EXPORT ThreadSafeArena {
   uint64_t tag_and_id_ = 0;
 
   TaggedAllocationPolicyPtr alloc_policy_;  // Tagged pointer to AllocPolicy.
+
+  // Pointer to a linked list of SerialArenaChunk.
+  std::atomic<SerialArenaChunk*> head_{nullptr};
+
   ThreadSafeArenaStatsHandle arena_stats_;
 
   // Adding a new chunk to head_ must be protected by mutex_.
   absl::Mutex mutex_;
-  // Pointer to a linked list of SerialArenaChunk.
-  std::atomic<SerialArenaChunk*> head_{nullptr};
 
-  void* first_owner_;
   // Must be declared after alloc_policy_; otherwise, it may lose info on
   // user-provided initial block.
   SerialArena first_arena_;
+
+  void* first_owner_;
 
   static_assert(std::is_trivially_destructible<SerialArena>{},
                 "SerialArena needs to be trivially destructible.");
@@ -187,7 +195,14 @@ class PROTOBUF_EXPORT ThreadSafeArena {
   // create a big enough block to accommodate n bytes.
   SerialArena* GetSerialArenaFallback(size_t n);
 
-  SerialArena* GetSerialArena();
+  SerialArena* GetSerialArenaSlow();
+  SerialArena* GetSerialArena() {
+    SerialArena* arena;
+    if (ABSL_PREDICT_TRUE(GetSerialArenaFast(&arena))) {
+      return arena;
+    }
+    return GetSerialArenaSlow();
+  }
 
   template <AllocationClient alloc_client = AllocationClient::kDefault>
   void* AllocateAlignedFallback(size_t n);

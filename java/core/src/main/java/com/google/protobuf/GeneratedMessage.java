@@ -8,6 +8,7 @@
 package com.google.protobuf;
 
 import static com.google.protobuf.Internal.checkNotNull;
+import static java.lang.Math.min;
 
 import com.google.protobuf.Descriptors.Descriptor;
 import com.google.protobuf.Descriptors.EnumDescriptor;
@@ -33,18 +34,29 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.logging.Logger;
 
 /**
  * All generated protocol message classes extend this class. This class implements most of the
- * Message and Builder interfaces using Java reflection. Users can ignore this class and pretend
- * that generated messages implement the Message interface directly.
+ * Message and Builder interfaces using Java reflection.
+ *
+ * <p>Users should generally ignore this class and use the Message interface instead.
+ *
+ * <p>This class is intended to only be extended by protoc created gencode. It is not intended or
+ * supported to extend this class, and any protected methods may be removed without it being
+ * considered a breaking change as long as all supported gencode does not depend on the changed
+ * methods.
  *
  * @author kenton@google.com Kenton Varda
  */
 public abstract class GeneratedMessage extends AbstractMessage implements Serializable {
   private static final long serialVersionUID = 1L;
+
+  private static final Logger logger = Logger.getLogger(GeneratedMessage.class.getName());
 
   /**
    * For testing. Allows a test to disable the optimization that avoids using field builders for
@@ -58,7 +70,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
    *
    * <p>TODO: mark this private and final (breaking change)
    */
-  protected UnknownFieldSet unknownFields;
+  protected
+  UnknownFieldSet unknownFields;
 
   protected GeneratedMessage() {
     unknownFields = UnknownFieldSet.getDefaultInstance();
@@ -101,30 +114,11 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
    */
   protected abstract FieldAccessorTable internalGetFieldAccessorTable();
 
+  // TODO: Remove this in a future breaking change for compatibility with old generated
+  // code in OSS. Try removing in google3 earlier once old generated code is updated (e.g. UTP).
   @Override
   public Descriptor getDescriptorForType() {
     return internalGetFieldAccessorTable().descriptor;
-  }
-
-  /**
-   * TODO: This method should be removed. It enables parsing directly into an
-   * "immutable" message. Have to leave it for now to support old gencode.
-   *
-   * @deprecated use newBuilder().mergeFrom() instead
-   */
-  @Deprecated
-  protected void mergeFromAndMakeImmutableInternal(
-      CodedInputStream input, ExtensionRegistryLite extensionRegistry)
-      throws InvalidProtocolBufferException {
-    Schema<GeneratedMessage> schema = Protobuf.getInstance().schemaFor(this);
-    try {
-      schema.mergeFrom(this, CodedInputStreamReader.forCodedInput(input), extensionRegistry);
-    } catch (InvalidProtocolBufferException e) {
-      throw e.setUnfinishedMessage(this);
-    } catch (IOException e) {
-      throw new InvalidProtocolBufferException(e).setUnfinishedMessage(this);
-    }
-    schema.makeImmutable(this);
   }
 
   /**
@@ -135,8 +129,12 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
    * @param getBytesForString whether to generate ByteString for string fields
    */
   private Map<FieldDescriptor, Object> getAllFieldsMutable(boolean getBytesForString) {
-    final TreeMap<FieldDescriptor, Object> result = new TreeMap<>();
     final FieldAccessorTable fieldAccessorTable = internalGetFieldAccessorTable();
+    // Cap the initial map capacity at 256. Messages with an enormous number of fields (such as
+    // giant oneofs) are typically very sparse in practice, so allocating a massive array upfront
+    // would be pointlessly wasteful.
+    final SmallSortedMap<FieldDescriptor> result =
+        new SmallSortedMap<>(min(fieldAccessorTable.fields.length, 256));
 
     final Descriptor descriptor = fieldAccessorTable.descriptor;
     final List<FieldDescriptor> fields = descriptor.getFields();
@@ -380,12 +378,60 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     }
   }
 
-  protected static boolean canUseUnsafe() {
-    return UnsafeUtil.hasUnsafeArrayOperations() && UnsafeUtil.hasUnsafeByteBufferOperations();
-  }
-
   protected static IntList emptyIntList() {
     return IntArrayList.emptyList();
+  }
+
+  static final String PRE22_GENCODE_SILENCE_PROPERTY =
+      "com.google.protobuf.use_unsafe_pre22_gencode";
+  static final String PRE22_GENCODE_ERROR_PROPERTY =
+      "com.google.protobuf.error_on_unsafe_pre22_gencode";
+
+  static final String PRE22_GENCODE_VULNERABILITY_MESSAGE =
+      "As of 2022/09/29 (release 21.7) makeExtensionsImmutable should not be called from protobuf"
+          + " gencode. If you are seeing this message, your gencode is vulnerable to a denial of"
+          + " service attack. You should regenerate your code using protobuf 25.6 or later. Use the"
+          + " latest version that meets your needs. However, if you understand the risks and wish"
+          + " to continue with vulnerable gencode, you can set the system property"
+          + " `-Dcom.google.protobuf.use_unsafe_pre22_gencode` on the command line to silence this"
+          + " warning. You also can set"
+          + " `-Dcom.google.protobuf.error_on_unsafe_pre22_gencode` to throw an error instead. See"
+          + " security vulnerability:"
+          + " https://github.com/protocolbuffers/protobuf/security/advisories/GHSA-h4h5-3hr4-j3g2";
+
+  protected static final Set<String> loggedPre22TypeNames = new CopyOnWriteArraySet<String>();
+
+  static void warnPre22Gencode(Class<?> messageClass) {
+    if (System.getProperty(PRE22_GENCODE_SILENCE_PROPERTY) != null) {
+      return;
+    }
+    String messageName = messageClass.getName();
+    String vulnerabilityMessage =
+        "Vulnerable protobuf generated type in use: "
+            + messageName
+            + "\n"
+            + PRE22_GENCODE_VULNERABILITY_MESSAGE;
+
+    if (System.getProperty(PRE22_GENCODE_ERROR_PROPERTY) != null) {
+      throw new UnsupportedOperationException(vulnerabilityMessage);
+    }
+
+    if (!loggedPre22TypeNames.add(messageName)) {
+      return;
+    }
+
+    logger.warning(vulnerabilityMessage);
+  }
+
+  /**
+   * This method only exists as a shim for pre-22 gencode. This function is a no-op other than
+   * warning or throwing an error for messages that are not extendable.
+   *
+   * @throws UnsupportedOperationException if the {@link #PRE22_GENCODE_ERROR_PROPERTY} system
+   *     property is set.
+   */
+  protected void makeExtensionsImmutable() {
+    warnPre22Gencode(getClass());
   }
 
   protected static LongList emptyLongList() {
@@ -438,9 +484,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     if (size != -1) {
       return size;
     }
-
-    memoizedSize = MessageReflection.getSerializedSize(
-        this, getAllFieldsRaw());
+    memoizedSize = MessageReflection.getSerializedSize(this, getAllFieldsRaw());
     return memoizedSize;
   }
 
@@ -560,8 +604,12 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     /** Internal helper which returns a mutable map. */
     private Map<FieldDescriptor, Object> getAllFieldsMutable() {
-      final TreeMap<FieldDescriptor, Object> result = new TreeMap<>();
       final FieldAccessorTable fieldAccessorTable = internalGetFieldAccessorTable();
+      // Cap the initial map capacity at 256. Messages with an enormous number of fields (such as
+      // giant oneofs) are typically very sparse in practice, so allocating a massive array upfront
+      // would be pointlessly wasteful.
+      final SmallSortedMap<FieldDescriptor> result =
+          new SmallSortedMap<>(min(fieldAccessorTable.fields.length, 256));
       final Descriptor descriptor = fieldAccessorTable.descriptor;
       final List<FieldDescriptor> fields = descriptor.getFields();
 
@@ -645,7 +693,14 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     @Override
     public BuilderT setField(final FieldDescriptor field, final Object value) {
-      internalGetFieldAccessorTable().getField(field).set(this, value);
+      // This transformation should be kept as long as LazyField is still around. We will use
+      // InternalLazyField as the internal details so we should not allow the legacy LazyField to be
+      // passed in.
+      Object valueToSet = value;
+      if (valueToSet instanceof LazyField) {
+        valueToSet = ((LazyField) value).getValue();
+      }
+      internalGetFieldAccessorTable().getField(field).set(this, valueToSet);
       return (BuilderT) this;
     }
 
@@ -885,14 +940,62 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     /** Check if a singular extension is present. */
     <T> boolean hasExtension(ExtensionLite<? extends MessageT, T> extension);
 
+    /**
+     * hasExtension() overload for {@link Extension} instances. Since {@link Extension} is a subtype
+     * of {@link ExtensionLite}, this is redundant for source-compatibility, but exists here to
+     * maintain ABI compatibility with .class files which dispatch to a method of the concrete type.
+     */
+    default <T> boolean hasExtension(Extension<? extends MessageT, T> extension) {
+      return hasExtension((ExtensionLite<? extends MessageT, T>) extension);
+    }
+
+    /** Overload to maintain ABI compatibility. See {@link #hasExtension(ExtensionLite)}. */
+    default <T> boolean hasExtension(GeneratedExtension<? extends MessageT, T> extension) {
+      return hasExtension((ExtensionLite<? extends MessageT, T>) extension);
+    }
+
     /** Get the number of elements in a repeated extension. */
     <T> int getExtensionCount(ExtensionLite<? extends MessageT, List<T>> extension);
+
+    /** Overload to maintain ABI compatibility. See {@link #getExtensionCount(ExtensionLite)}. */
+    default <T> int getExtensionCount(Extension<? extends MessageT, List<T>> extension) {
+      return getExtensionCount((ExtensionLite<? extends MessageT, List<T>>) extension);
+    }
+
+    /** Overload to maintain ABI compatibility. See {@link #getExtensionCount(ExtensionLite)}. */
+    default <T> int getExtensionCount(GeneratedExtension<MessageT, List<T>> extension) {
+      return getExtensionCount((ExtensionLite<? extends MessageT, List<T>>) extension);
+    }
 
     /** Get the value of an extension. */
     <T> T getExtension(ExtensionLite<? extends MessageT, T> extension);
 
+    /** Get the value of a message-typed extension, or null if it is not set. */
+    <T extends MessageLite> T getMessageTypedExtensionOrNull(
+        ExtensionLite<? extends MessageT, T> extension);
+
+    /** Overload to maintain ABI compatibility. See {@link #getExtension(ExtensionLite)}. */
+    default <T> T getExtension(Extension<? extends MessageT, T> extension) {
+      return getExtension((ExtensionLite<? extends MessageT, T>) extension);
+    }
+
+    /** Overload to maintain ABI compatibility. See {@link #getExtension(ExtensionLite)}. */
+    default <T> T getExtension(GeneratedExtension<MessageT, T> extension) {
+      return getExtension((ExtensionLite<? extends MessageT, T>) extension);
+    }
+
     /** Get one element of a repeated extension. */
     <T> T getExtension(ExtensionLite<? extends MessageT, List<T>> extension, int index);
+
+    /** Overload to maintain ABI compatibility. See {@link #getExtension(ExtensionLite)}. */
+    default <T> T getExtension(Extension<? extends MessageT, List<T>> extension, int index) {
+      return getExtension((ExtensionLite<? extends MessageT, List<T>>) extension, index);
+    }
+
+    /** Overload to maintain ABI compatibility. See {@link #getExtension(ExtensionLite)}. */
+    default <T> T getExtension(GeneratedExtension<MessageT, List<T>> extension, int index) {
+      return getExtension((ExtensionLite<? extends MessageT, List<T>>) extension, index);
+    }
   }
 
   /**
@@ -943,12 +1046,28 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       this.extensions = builder.buildExtensions();
     }
 
-    private void verifyExtensionContainingType(final Extension<? extends MessageT, ?> extension) {
-      if (extension.getDescriptor().getContainingType() != getDescriptorForType()) {
+    /**
+     * Returns true if the extensions in this message are equal to the extensions in the other
+     * message. Does not consider any any other state of the messages.
+     */
+    protected boolean extensionsEquals(ExtendableMessage<?> other) {
+      return this.extensions.equals(other.extensions);
+    }
+
+    /**
+     * Returns an iterator over the set extensions lazily wrapped in {@link FieldEntry} objects.
+     * Order is unspecified.
+     */
+    public final Iterator<FieldEntry> extensionsIterator() {
+      return new FieldEntryIterator(extensions);
+    }
+
+    private void verifyExtensionContainingType(final FieldDescriptor descriptor) {
+      if (descriptor.getContainingType() != getDescriptorForType()) {
         // This can only happen if someone uses unchecked operations.
         throw new IllegalArgumentException(
             "Extension is for type \""
-                + extension.getDescriptor().getContainingType().getFullName()
+                + descriptor.getContainingType().getFullName()
                 + "\" which does not match message type \""
                 + getDescriptorForType().getFullName()
                 + "\".");
@@ -961,8 +1080,9 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
-      verifyExtensionContainingType(extension);
-      return extensions.hasField(extension.getDescriptor());
+      final FieldDescriptor descriptor = extension.getDescriptor();
+      verifyExtensionContainingType(descriptor);
+      return extensions.hasField(descriptor);
     }
 
     /** Get the number of elements in a repeated extension. */
@@ -971,8 +1091,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         final ExtensionLite<? extends MessageT, List<T>> extensionLite) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
-      verifyExtensionContainingType(extension);
       final FieldDescriptor descriptor = extension.getDescriptor();
+      verifyExtensionContainingType(descriptor);
       return extensions.getRepeatedFieldCount(descriptor);
     }
 
@@ -982,29 +1102,28 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     public final <T> T getExtension(final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
 
-      verifyExtensionContainingType(extension);
-      FieldDescriptor descriptor = extension.getDescriptor();
+      final FieldDescriptor descriptor = extension.getDescriptor();
+      verifyExtensionContainingType(descriptor);
       final Object value = extensions.getField(descriptor);
-      T result = null;
       if (value == null) {
-        if (descriptor.isRepeated()) {
-          result = (T) ProtobufArrayList.emptyList();
-        } else if (descriptor.getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
-          result = (T) extension.getMessageDefaultInstance();
-        } else {
-          result = (T) extension.fromReflectionType(descriptor.getDefaultValue());
-        }
-      } else {
-        result = (T) extension.fromReflectionType(value);
+        return extension.getDefaultValue();
       }
+      return (T) extension.fromReflectionType(value);
+    }
 
-      // If the lazy field is corrupted, we need to invalidate the memoized size in case the
-      // corrupted message data was replaced with an empty ByteString and yet a previous serialized
-      // size was memoized.
-      if (extensions.lazyFieldCorrupted(descriptor)) {
-        setMemoizedSerializedSize(-1);
+    @Override
+    @SuppressWarnings("unchecked") // Safe as fromReflectionType will always match the type of T.
+    public final <T extends MessageLite> T getMessageTypedExtensionOrNull(
+        final ExtensionLite<? extends MessageT, T> extensionLite) {
+      Extension<MessageT, T> extension = checkNotLite(extensionLite);
+
+      final FieldDescriptor descriptor = extension.getDescriptor();
+      verifyExtensionContainingType(descriptor);
+      final Object value = extensions.getField(descriptor);
+      if (value == null) {
+        return null;
       }
-      return result;
+      return (T) extension.fromReflectionType(value);
     }
 
     /** Get one element of a repeated extension. */
@@ -1014,8 +1133,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         final ExtensionLite<? extends MessageT, List<T>> extensionLite, final int index) {
       Extension<MessageT, List<T>> extension = checkNotLite(extensionLite);
 
-      verifyExtensionContainingType(extension);
-      FieldDescriptor descriptor = extension.getDescriptor();
+      final FieldDescriptor descriptor = extension.getDescriptor();
+      verifyExtensionContainingType(descriptor);
       return (T)
           extension.singularFromReflectionType(extensions.getRepeatedField(descriptor, index));
     }
@@ -1029,6 +1148,16 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     @Override
     public boolean isInitialized() {
       return super.isInitialized() && extensionsAreInitialized();
+    }
+
+    /**
+     * This method only exists as a shim for pre-22 gencode (see {@link
+     * GeneratedMessage.warnPre22Gencode}.
+     */
+    @Override
+    protected void makeExtensionsImmutable() {
+      GeneratedMessage.warnPre22Gencode(getClass());
+      extensions.makeImmutable();
     }
 
     /**
@@ -1074,24 +1203,27 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       public void writeUntil(final int end, final CodedOutputStream output) throws IOException {
         while (next != null && next.getKey().getNumber() < end) {
           FieldDescriptor descriptor = next.getKey();
-          if (messageSetWireFormat
-              && descriptor.getLiteJavaType() == WireFormat.JavaType.MESSAGE
-              && !descriptor.isRepeated()) {
-            if (next instanceof LazyField.LazyEntry<?>) {
-              output.writeRawMessageSetExtension(
-                  descriptor.getNumber(),
-                  ((LazyField.LazyEntry<?>) next).getField().toByteString());
-            } else {
-              output.writeMessageSetExtension(descriptor.getNumber(), (Message) next.getValue());
-            }
+
+          boolean isSingularMessage =
+              descriptor.getLiteJavaType() == WireFormat.JavaType.MESSAGE
+                  && !descriptor.isRepeated();
+          boolean lazy = next instanceof InternalLazyField.LazyEntry<?>;
+
+          if (lazy && !isSingularMessage) {
+            throw new IllegalStateException("Lazy fields must be singular messages.");
+          }
+
+          if (messageSetWireFormat && lazy) {
+            output.writeRawMessageSetExtension(
+                descriptor.getNumber(),
+                ((InternalLazyField.LazyEntry<?>) next).getField().toByteString());
+          } else if (messageSetWireFormat && isSingularMessage) {
+            output.writeMessageSetExtension(descriptor.getNumber(), (Message) next.getValue());
+          } else if (lazy) {
+            output.writeBytes(
+                descriptor.getNumber(),
+                ((InternalLazyField.LazyEntry<?>) next).getField().toByteString());
           } else {
-            // TODO: Taken care of following code, it may cause
-            // problem when we use LazyField for normal fields/extensions.
-            // Due to the optional field can be duplicated at the end of
-            // serialized bytes, which will make the serialized size change
-            // after lazy field parsed. So when we use LazyField globally,
-            // we need to change the following write method to write cached
-            // bytes directly rather than write the parsed message.
             FieldSet.writeField(descriptor, next.getValue(), output);
           }
           if (iter.hasNext()) {
@@ -1226,6 +1358,45 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         throw new IllegalArgumentException("FieldDescriptor does not match message type.");
       }
     }
+
+    /** A wrapper for a field descriptor and its value. */
+    public static final class FieldEntry {
+      private final FieldDescriptor descriptor;
+      private final Object value;
+
+      public FieldDescriptor getDescriptor() {
+        return descriptor;
+      }
+
+      public Object getValue() {
+        return value;
+      }
+
+      FieldEntry(FieldDescriptor descriptor, Object value) {
+        this.descriptor = descriptor;
+        this.value = value;
+      }
+    }
+
+    private static final class FieldEntryIterator implements Iterator<FieldEntry> {
+      private final Iterator<Map.Entry<FieldDescriptor, Object>> iter;
+
+      FieldEntryIterator(FieldSet<FieldDescriptor> fieldSet) {
+        this.iter = fieldSet.iterator();
+      }
+
+      @Override
+      public final boolean hasNext() {
+        return iter.hasNext();
+      }
+
+      @Override
+      public final FieldEntry next() {
+        // Just let the inner iterator throw the NoSuchElementException.
+        Map.Entry<FieldDescriptor, Object> entry = iter.next();
+        return new FieldEntry(entry.getKey(), entry.getValue());
+      }
+    }
   }
 
   /**
@@ -1330,21 +1501,31 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     @Override
     public final <T> T getExtension(final ExtensionLite<? extends MessageT, T> extensionLite) {
       Extension<MessageT, T> extension = checkNotLite(extensionLite);
-
       verifyExtensionContainingType(extension);
-      FieldDescriptor descriptor = extension.getDescriptor();
-      final Object value = extensions == null ? null : extensions.getField(descriptor);
-      if (value == null) {
-        if (descriptor.isRepeated()) {
-          return (T) Collections.emptyList();
-        } else if (descriptor.getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
-          return (T) extension.getMessageDefaultInstance();
-        } else {
-          return (T) extension.fromReflectionType(descriptor.getDefaultValue());
-        }
-      } else {
-        return (T) extension.fromReflectionType(value);
+      if (extensions == null) {
+        return extension.getDefaultValue();
       }
+      final Object value = extensions.getField(extension.getDescriptor());
+      if (value == null) {
+        return extension.getDefaultValue();
+      }
+      return (T) extension.fromReflectionType(value);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked") // Safe as fromReflectionType will always match the type of T.
+    public final <T extends MessageLite> T getMessageTypedExtensionOrNull(
+        final ExtensionLite<? extends MessageT, T> extensionLite) {
+      Extension<MessageT, T> extension = checkNotLite(extensionLite);
+      verifyExtensionContainingType(extension);
+      if (extensions == null) {
+        return null;
+      }
+      final Object value = extensions.getField(extension.getDescriptor());
+      if (value == null) {
+        return null;
+      }
+      return (T) extension.fromReflectionType(value);
     }
 
     /** Get one element of a repeated extension. */
@@ -1362,6 +1543,12 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
           extension.singularFromReflectionType(extensions.getRepeatedField(descriptor, index));
     }
 
+    /** Overload to maintain ABI compatibility. See {@link #setExtension(ExtensionLite, Object)}. */
+    public final <T> BuilderT setExtension(
+        final Extension<? extends MessageT, T> extension, final T value) {
+      return setExtension((ExtensionLite<? extends MessageT, T>) extension, value);
+    }
+
     /** Set the value of an extension. */
     public final <T> BuilderT setExtension(
         final ExtensionLite<? extends MessageT, T> extensionLite, final T value) {
@@ -1373,6 +1560,15 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       extensions.setField(descriptor, extension.toReflectionType(value));
       onChanged();
       return (BuilderT) this;
+    }
+
+    /**
+     * Overload to maintain ABI compatibility. See {@link #setExtension(ExtensionLite, int,
+     * Object)}.
+     */
+    public final <T> BuilderT setExtension(
+        final Extension<? extends MessageT, List<T>> extension, final int index, final T value) {
+      return setExtension((ExtensionLite<? extends MessageT, List<T>>) extension, index, value);
     }
 
     /** Set the value of one element of a repeated extension. */
@@ -1390,6 +1586,12 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       return (BuilderT) this;
     }
 
+    /** Overload to maintain ABI compatibility. See {@link #addExtension(ExtensionLite, Object)}. */
+    public final <T> BuilderT addExtension(
+        final Extension<? extends MessageT, List<T>> extension, final T value) {
+      return addExtension((ExtensionLite<? extends MessageT, List<T>>) extension, value);
+    }
+
     /** Append a value to a repeated extension. */
     public final <T> BuilderT addExtension(
         final ExtensionLite<? extends MessageT, List<T>> extensionLite, final T value) {
@@ -1401,6 +1603,11 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       extensions.addRepeatedField(descriptor, extension.singularToReflectionType(value));
       onChanged();
       return (BuilderT) this;
+    }
+
+    /** Overload to maintain ABI compatibility. See {@link #clearExtension(ExtensionLite)}. */
+    public final <T> BuilderT clearExtension(final Extension<? extends MessageT, T> extension) {
+      return clearExtension((ExtensionLite<? extends MessageT, T>) extension);
     }
 
     /** Clear an extension. */
@@ -1564,7 +1771,14 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       if (field.isExtension()) {
         verifyContainingType(field);
         ensureExtensionsIsMutable();
-        extensions.setField(field, value);
+        // This transformation should be kept as long as LazyField is still around. We will use
+        // InternalLazyField as the internal details so we should not allow the legacy LazyField to
+        // be passed in.
+        if (value instanceof LazyField) {
+          extensions.setField(field, ((LazyField) value).getValue());
+        } else {
+          extensions.setField(field, value);
+        }
         onChanged();
         return (BuilderT) this;
       } else {
@@ -1623,7 +1837,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
 
     // TODO: Should be marked final in v5.x.x once GeneratedMessageV3 is removed.
     protected void mergeExtensionFields(final ExtendableMessage<?> other) {
-      if (other.extensions != null) {
+      if (other.extensions != null && !other.extensions.isEmpty()) {
         ensureExtensionsIsMutable();
         extensions.mergeFrom(other.extensions);
         onChanged();
@@ -1675,7 +1889,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         new CachedDescriptorRetriever() {
           @Override
           public FieldDescriptor loadDescriptor() {
-            return scope.getDescriptorForType().getExtensions().get(descriptorIndex);
+            return scope.getDescriptorForType().getExtension(descriptorIndex);
           }
         },
         singularType,
@@ -1928,9 +2142,9 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     @SuppressWarnings("unchecked")
     public T getDefaultValue() {
       if (isRepeated()) {
-        return (T) Collections.emptyList();
+        return (T) ProtobufArrayList.emptyList();
       }
-      if (getDescriptor().getJavaType() == FieldDescriptor.JavaType.MESSAGE) {
+      if (messageDefaultInstance != null) {
         return (T) messageDefaultInstance;
       }
       return (T) singularFromReflectionType(getDescriptor().getDefaultValue());
@@ -2029,8 +2243,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     public FieldAccessorTable(final Descriptor descriptor, final String[] camelCaseNames) {
       this.descriptor = descriptor;
       this.camelCaseNames = camelCaseNames;
-      fields = new FieldAccessor[descriptor.getFields().size()];
-      oneofs = new OneofAccessor[descriptor.getOneofs().size()];
+      fields = new FieldAccessor[descriptor.getFieldCount()];
+      oneofs = new OneofAccessor[descriptor.getOneofCount()];
       initialized = false;
     }
 
@@ -2053,7 +2267,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
         }
         int fieldsSize = fields.length;
         for (int i = 0; i < fieldsSize; i++) {
-          FieldDescriptor field = descriptor.getFields().get(i);
+          FieldDescriptor field = descriptor.getField(i);
           String containingOneofCamelCaseName = null;
           if (field.getContainingOneof() != null) {
             int index = fieldsSize + field.getContainingOneof().getIndex();
@@ -2113,8 +2327,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
           }
         }
 
-        for (int i = 0; i < descriptor.getOneofs().size(); i++) {
-          if (i < descriptor.getRealOneofs().size()) {
+        for (int i = 0; i < descriptor.getOneofCount(); i++) {
+          if (i < descriptor.getRealOneofCount()) {
             oneofs[i] =
                 new RealOneofAccessor(
                     descriptor, camelCaseNames[i + fieldsSize], messageClass, builderClass);
@@ -2261,8 +2475,8 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     /** SyntheticOneofAccessor provides access to a single synthetic oneof. */
     private static class SyntheticOneofAccessor implements OneofAccessor {
       SyntheticOneofAccessor(final Descriptor descriptor, final int oneofIndex) {
-        OneofDescriptor oneofDescriptor = descriptor.getOneofs().get(oneofIndex);
-        fieldDescriptor = oneofDescriptor.getFields().get(0);
+        OneofDescriptor oneofDescriptor = descriptor.getOneof(oneofIndex);
+        fieldDescriptor = oneofDescriptor.getField(0);
       }
 
       private final FieldDescriptor fieldDescriptor;
@@ -3260,8 +3474,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     }
     Arrays.sort(keys);
     for (int key : keys) {
-      out.writeMessage(
-          fieldNumber, defaultEntry.newBuilderForType().setKey(key).setValue(m.get(key)).build());
+      serializeMapFieldEntryTo(out, defaultEntry, fieldNumber, key, m.get(key));
     }
   }
 
@@ -3284,8 +3497,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     }
     Arrays.sort(keys);
     for (long key : keys) {
-      out.writeMessage(
-          fieldNumber, defaultEntry.newBuilderForType().setKey(key).setValue(m.get(key)).build());
+      serializeMapFieldEntryTo(out, defaultEntry, fieldNumber, key, m.get(key));
     }
   }
 
@@ -3307,8 +3519,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
     keys = m.keySet().toArray(keys);
     Arrays.sort(keys);
     for (String key : keys) {
-      out.writeMessage(
-          fieldNumber, defaultEntry.newBuilderForType().setKey(key).setValue(m.get(key)).build());
+      serializeMapFieldEntryTo(out, defaultEntry, fieldNumber, key, m.get(key));
     }
   }
 
@@ -3335,8 +3546,7 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       boolean key)
       throws IOException {
     if (m.containsKey(key)) {
-      out.writeMessage(
-          fieldNumber, defaultEntry.newBuilderForType().setKey(key).setValue(m.get(key)).build());
+      serializeMapFieldEntryTo(out, defaultEntry, fieldNumber, key, m.get(key));
     }
   }
 
@@ -3345,13 +3555,16 @@ public abstract class GeneratedMessage extends AbstractMessage implements Serial
       CodedOutputStream out, Map<K, V> m, MapEntry<K, V> defaultEntry, int fieldNumber)
       throws IOException {
     for (Map.Entry<K, V> entry : m.entrySet()) {
-      out.writeMessage(
-          fieldNumber,
-          defaultEntry
-              .newBuilderForType()
-              .setKey(entry.getKey())
-              .setValue(entry.getValue())
-              .build());
+      serializeMapFieldEntryTo(out, defaultEntry, fieldNumber, entry.getKey(), entry.getValue());
     }
+  }
+
+  private static <K, V> void serializeMapFieldEntryTo(
+      CodedOutputStream out, MapEntry<K, V> defaultEntry, int fieldNumber, K key, V value)
+      throws IOException {
+    out.writeTag(fieldNumber, WireFormat.WIRETYPE_LENGTH_DELIMITED);
+    out.writeUInt32NoTag(
+        MapEntryLite.computeSerializedSize(defaultEntry.getMetadata(), key, value));
+    MapEntryLite.writeTo(out, defaultEntry.getMetadata(), key, value);
   }
 }

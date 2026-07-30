@@ -12,7 +12,7 @@ import glob
 import os
 import sys
 
-from setuptools import setup, Extension, find_namespace_packages
+from setuptools import Extension, find_namespace_packages, setup
 
 
 def GetVersion():
@@ -28,14 +28,35 @@ def GetVersion():
   with open(os.path.join('google', 'protobuf', '__init__.py')) as version_file:
     file_globals = {}
     exec(version_file.read(), file_globals)  # pylint:disable=exec-used
-    return file_globals["__version__"]
+    return file_globals['__version__']
 
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 extra_link_args = []
+extra_compile_args = []
 
 if sys.platform.startswith('win'):
   extra_link_args = ['-static']
+else:
+  extra_compile_args = ['-fvisibility=hidden']
+
+# If at some point the fasttable decoder is ready for prime time, we could
+# enable it here. But even then we'll need to disable it on platforms where
+# it will not work (eg. 32-bit, MSVC).
+fasttable_decoder_enabled = False
+
+srcs = (
+    glob.glob('google/protobuf/*.c')
+    + glob.glob('python/*.c')
+    + glob.glob('upb/**/*.c', recursive=True)
+    + glob.glob('utf8_range/*.c')
+)
+
+if not fasttable_decoder_enabled:
+  # Our heuristic is to match any file that contains `decode_fast` in the name.
+  # If we change the file names of the fast decoder, we will have to update
+  # this heuristic.
+  srcs = list(filter(lambda src: 'decode_fast' not in src, srcs))
 
 setup(
     name='protobuf',
@@ -53,25 +74,23 @@ setup(
     classifiers=[
         'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
         'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3.14',
     ],
     packages=find_namespace_packages(include=['google*']),
     install_requires=[],
     ext_modules=[
         Extension(
             'google._upb._message',
-            glob.glob('google/protobuf/*.c')
-            + glob.glob('python/*.c')
-            + glob.glob('upb/**/*.c', recursive=True)
-            + glob.glob('utf8_range/*.c'),
+            srcs,
             include_dirs=[current_dir, os.path.join(current_dir, 'utf8_range')],
             language='c',
             extra_link_args=extra_link_args,
+            extra_compile_args=extra_compile_args,
         )
     ],
-    python_requires='>=3.9',
+    python_requires='>=3.10',
 )

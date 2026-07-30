@@ -603,6 +603,50 @@ class EncodeDecodeTest extends TestBase
         $this->assertEquals(-1, $m->getOptionalInt32());
     }
 
+    public function testInvalidVarintLength() {
+        $this->expectException(Exception::class);
+
+        $m = new TestMessage();
+        $m->mergeFromString(hex2bin("0afaffffff0f"));
+    }
+
+    private function makeRecursiveMessage($depth) {
+        $m = new TestMessage();
+        $m->setOptionalInt32(1);
+        if ($depth == 0) {
+            return $m;
+        }
+        $m->setRecursive($this->makeRecursiveMessage($depth - 1));
+        return $m;
+    }
+
+    public function testRecursiveMessage() {
+        // TODO: shaod - Re-enable this test once the memory leak is fixed.
+        if (getenv("USE_VALGRIND")) {
+            $this->markTestSkipped("skipping for valgrind because of a memory leak");
+        }
+        $payload = $this->makeRecursiveMessage(99)->serializeToString();
+
+        $m = new TestMessage();
+        $m->mergeFromString($payload);
+
+        // If execution reaches this line, it means no exception was thrown.
+        // This assertion prevents PHPUnit from marking the test as risky.
+        $this->assertTrue(true);
+    }
+
+    public function testOverlyRecursiveMessage() {
+        // TODO: shaod - Re-enable this test once the memory leak is fixed.
+        if (getenv("USE_VALGRIND")) {
+            $this->markTestSkipped("skipping for valgrind because of a memory leak");
+        }
+        $this->expectException(Exception::class);
+        $payload = $this->makeRecursiveMessage(101)->serializeToString();
+
+        $m = new TestMessage();
+        $m->mergeFromString($payload);
+    }
+
     public function testRandomFieldOrder()
     {
         $m = new TestRandomFieldOrder();
@@ -1350,6 +1394,58 @@ class EncodeDecodeTest extends TestBase
         $this->assertSame("\"foo.barBaz,qux\"", $m->serializeToJsonString());
     }
 
+    public function testEncodeFieldMaskWithInvalidPath()
+    {
+        $m = new FieldMask();
+        $m->setPaths(["foo.bar__baz"]);
+
+        // On upb this case raises an exception, on pure PHP we currently only
+        // trigger a warning and don't throw an exception.
+        if (extension_loaded('protobuf')) {
+            $this->expectException(Exception::class);
+            $m->serializeToJsonString();
+        } else {
+            $triggered = false;
+            set_error_handler(function($errno, $errstr) use (&$triggered) {
+                $triggered = true;
+                $this->assertStringContainsString("Underscore in FieldMask path must be followed by a lowercase letter", $errstr);
+                return true;
+            }, E_USER_WARNING);
+
+            $result = $m->serializeToJsonString();
+            restore_error_handler();
+
+            $this->assertTrue($triggered, "Warning was not triggered");
+            $this->assertSame("\"foo.barBaz\"", $result);
+        }
+    }
+
+    public function testEncodeFieldMaskWithUppercasePath()
+    {
+        $m = new FieldMask();
+        $m->setPaths(["foo.BarBaz"]);
+
+        // On upb this case raises an exception, on pure PHP we currently only
+        // trigger a warning and don't throw an exception.
+        if (extension_loaded('protobuf')) {
+            $this->expectException(Exception::class);
+            $m->serializeToJsonString();
+        } else {
+            $triggered = false;
+            set_error_handler(function($errno, $errstr) use (&$triggered) {
+                $triggered = true;
+                $this->assertStringContainsString("Field mask element may not have upper-case letter", $errstr);
+                return true;
+            }, E_USER_WARNING);
+
+            $result = $m->serializeToJsonString();
+            restore_error_handler();
+
+            $this->assertTrue($triggered, "Warning was not triggered");
+            $this->assertSame("\"foo.BarBaz\"", $result);
+        }
+    }
+
     public function testDecodeEmptyFieldMask()
     {
         $m = new FieldMask();
@@ -1596,7 +1692,7 @@ class EncodeDecodeTest extends TestBase
         $this->assertEquals($defaultValue, $to->getOneofFieldUnwrapped());
     }
 
-    public function wrappersDataProvider()
+    public static function wrappersDataProvider()
     {
         return [
             [TestInt32Value::class, 1, "1", 0, "0"],
@@ -1706,5 +1802,338 @@ class EncodeDecodeTest extends TestBase
             [true, '{"oneof_enum":"ONE"}'],
             [false, '{"oneofEnum":"ONE"}'],
         ];
+    }
+
+    public function testEmitDefaultsInt32()
+    {
+        $m = new TestMessage();
+        // Without EMIT_DEFAULTS, default values should not be included
+        $this->assertSame("{}", $m->serializeToJsonString());
+
+        // With EMIT_DEFAULTS, default values should be included
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalInt32":0', $json);
+        $this->assertStringContainsString('"optionalUint32":0', $json);
+        $this->assertStringContainsString('"optionalSint32":0', $json);
+    }
+
+    public function testEmitDefaultsInt64()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalInt64":"0"', $json);
+        $this->assertStringContainsString('"optionalUint64":"0"', $json);
+        $this->assertStringContainsString('"optionalSint64":"0"', $json);
+    }
+
+    public function testEmitDefaultsFloat()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalFloat":0', $json);
+        $this->assertStringContainsString('"optionalDouble":0', $json);
+    }
+
+    public function testEmitDefaultsBool()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalBool":false', $json);
+    }
+
+    public function testEmitDefaultsString()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalString":""', $json);
+        $this->assertStringContainsString('"optionalBytes":""', $json);
+    }
+
+    public function testEmitDefaultsEnum()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalEnum":"ZERO"', $json);
+    }
+
+    public function testEmitDefaultsMessage()
+    {
+        $m = new TestMessage();
+        // Messages are not included even with EMIT_DEFAULTS when they are null
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertThat($json, $this->logicalNot($this->stringContains('"optionalMessage"')));
+    }
+
+    public function testEmitDefaultsRepeatedFields()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+
+        // Empty repeated fields should be included as [] with EMIT_DEFAULTS
+        $this->assertStringContainsString('"repeatedInt32":[]', $json);
+        $this->assertStringContainsString('"repeatedString":[]', $json);
+
+        // Non-empty repeated fields are always included
+        $m->setRepeatedInt32([1, 2, 3]);
+        $json2 = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"repeatedInt32":[1,2,3]', $json2);
+    }
+
+    public function testEmitDefaultsMaps()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+
+        // Empty maps should be included as {} with EMIT_DEFAULTS
+        $this->assertStringContainsString('"mapInt32Int32":{}', $json);
+        $this->assertStringContainsString('"mapStringString":{}', $json);
+
+        // Non-empty maps are always included
+        $m->getMapInt32Int32()[1] = 100;
+        $json2 = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"mapInt32Int32":{"1":100}', $json2);
+    }
+
+    public function testEmitDefaultsWithNonDefaultValues()
+    {
+        $m = new TestMessage();
+        $m->setOptionalInt32(42);
+        $m->setOptionalString("test");
+
+        // Non-default values should always be included
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalInt32":42', $json);
+        $this->assertStringContainsString('"optionalString":"test"', $json);
+
+        // Default values should also be included
+        $this->assertStringContainsString('"optionalBool":false', $json);
+        $this->assertStringContainsString('"optionalDouble":0', $json);
+    }
+
+    public function testEmitDefaultsWithPreserveProtoFieldNames()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(
+            PrintOptions::EMIT_DEFAULTS | PrintOptions::PRESERVE_PROTO_FIELD_NAMES
+        );
+
+        // Should use proto field names (with underscores)
+        $this->assertStringContainsString('"optional_int32":0', $json);
+        $this->assertStringContainsString('"optional_string":""', $json);
+        $this->assertStringContainsString('"optional_bool":false', $json);
+    }
+
+    public function testEmitDefaultsWithAlwaysPrintEnumsAsInts()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(
+            PrintOptions::EMIT_DEFAULTS | PrintOptions::ALWAYS_PRINT_ENUMS_AS_INTS
+        );
+
+        // Enum should be printed as integer
+        $this->assertStringContainsString('"optionalEnum":0', $json);
+    }
+
+    public function testEmitDefaultsAllFlags()
+    {
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(
+            PrintOptions::EMIT_DEFAULTS |
+            PrintOptions::PRESERVE_PROTO_FIELD_NAMES |
+            PrintOptions::ALWAYS_PRINT_ENUMS_AS_INTS
+        );
+
+        // Should have all three flag behaviors
+        $this->assertStringContainsString('"optional_int32":0', $json);
+        $this->assertStringContainsString('"optional_enum":0', $json);
+        $this->assertStringContainsString('"optional_bool":false', $json);
+    }
+
+    public function testEmitDefaultsDoesNotAffectParsing()
+    {
+        // Create a message with default values using EMIT_DEFAULTS
+        $m1 = new TestMessage();
+        $json = $m1->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+
+        // Parse it back
+        $m2 = new TestMessage();
+        $m2->mergeFromJsonString($json);
+
+        // All fields should have default values
+        $this->assertSame(0, $m2->getOptionalInt32());
+        $this->assertSame(false, $m2->getOptionalBool());
+        $this->assertSame('', $m2->getOptionalString());
+        $this->assertSame(TestEnum::ZERO, $m2->getOptionalEnum());
+    }
+
+    public function testEmitDefaultsWithSetThenClearedField()
+    {
+        $m = new TestMessage();
+        $m->setOptionalInt32(42);
+        $m->setOptionalInt32(0);  // Set back to default
+
+        // Without EMIT_DEFAULTS, should not be in JSON
+        $json1 = $m->serializeToJsonString();
+        $this->assertSame("{}", $json1);
+
+        // With EMIT_DEFAULTS, should be in JSON
+        $json2 = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"optionalInt32":0', $json2);
+    }
+
+    public function testEmitDefaultsTrueOptionalFieldsWithHazzer()
+    {
+        // True optional fields (proto3 optional) should not be included
+        // even with EMIT_DEFAULTS if they haven't been set
+        $m = new TestMessage();
+        $json = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+
+        // Regular optional (implicit presence) should be included
+        $this->assertStringContainsString('"optionalInt32":0', $json);
+
+        // True optional (explicit presence) should NOT be included if not set
+        $this->assertThat($json, $this->logicalNot($this->stringContains('"trueOptionalInt32"')));
+
+        // But if we set the true optional field, it should be included
+        $m->setTrueOptionalInt32(0);
+        $json2 = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertStringContainsString('"trueOptionalInt32":0', $json2);
+    }
+
+    public function testEmitDefaultsWellKnownTypes()
+    {
+        // Test with wrapper types
+        $m = new Int32Value();
+
+        // Without setting value
+        $json1 = $m->serializeToJsonString();
+        $this->assertSame("0", $json1);
+
+        // With EMIT_DEFAULTS (should behave the same for wrapper types)
+        $json2 = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertSame("0", $json2);
+    }
+
+    public function testEmitDefaultsStructAndListValue()
+    {
+        // Test with ListValue
+        $m = new ListValue();
+
+        // Empty ListValue
+        $json1 = $m->serializeToJsonString();
+        $this->assertSame("[]", $json1);
+
+        // With EMIT_DEFAULTS
+        $json2 = $m->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertSame("[]", $json2);
+
+        // Test with Struct
+        $s = new Struct();
+
+        // Empty Struct
+        $json3 = $s->serializeToJsonString();
+        $this->assertSame("{}", $json3);
+
+        // With EMIT_DEFAULTS
+        $json4 = $s->serializeToJsonString(PrintOptions::EMIT_DEFAULTS);
+        $this->assertSame("{}", $json4);
+    }
+
+    public function testJsonEncodeFloatLocaleIndependent()
+    {
+        $originalLocale = setlocale(LC_NUMERIC, 0);
+        $localeSet = setlocale(LC_NUMERIC, 'de_DE.UTF-8', 'de_DE', 'cs_CZ.UTF-8', 'cs_CZ', 'fr_FR.UTF-8', 'fr_FR');
+        if ($localeSet === false) {
+            $this->markTestSkipped('No locale with comma decimal separator available');
+        }
+
+        try {
+            $m = new FloatValue();
+            $m->setValue(3.14159);
+            $json = $m->serializeToJsonString();
+            $this->assertStringNotContainsString(',', $json);
+            $this->assertStringContainsString('.', $json);
+            $this->assertNotNull(json_decode($json));
+
+            $m2 = new DoubleValue();
+            $m2->setValue(3.141592653589793);
+            $json2 = $m2->serializeToJsonString();
+            $this->assertStringNotContainsString(',', $json2);
+            $this->assertStringContainsString('.', $json2);
+            $this->assertNotNull(json_decode($json2));
+        } finally {
+            setlocale(LC_NUMERIC, $originalLocale);
+        }
+    }
+
+    public function testDecodeRecursionLimit()
+    {
+        // Build a message nested deeper than the default limit of 100.
+        $msg = $this->makeRecursiveMessage(150);
+        $payload = $msg->serializeToString(200);
+
+        // Decoding deeper than the default limit fails without an override
+        try {
+            (new TestMessage())->mergeFromString($payload);
+            $this->fail('Expected an exception for exceeding the recursion limit');
+        } catch (Exception $e) {
+        }
+
+        // Raising the limit lets the deep message parse all the way down.
+        $decoded = new TestMessage();
+        $decoded->mergeFromString($payload, 200);
+
+        $cur = $decoded;
+        for ($i = 0; $i < 150; $i++) {
+            $cur = $cur->getRecursive();
+            $this->assertNotNull($cur);
+        }
+        $this->assertSame(1, $cur->getOptionalInt32());
+    }
+
+    public function testEncodeRecursionLimit()
+    {
+        $msg = $this->makeRecursiveMessage(150);
+
+        // The C extension enforces a depth limit on encode and throws past it;
+        // the pure-PHP encoder has no such guard, so only assert on the C ext.
+        if (extension_loaded('protobuf')) {
+            try {
+                $msg->serializeToString();
+                $this->fail('Expected an exception for exceeding the recursion limit');
+            } catch (Exception $e) {
+                $this->assertStringContainsString('Max nesting exceeded', $e->getMessage());
+            }
+        }
+
+        // Raising the limit lets the deep message serialize.
+        $payload = $msg->serializeToString(200);
+        $this->assertNotEquals('', $payload);
+    }
+
+    public function testInvalidRecursionLimit()
+    {
+        if (!extension_loaded('protobuf')) {
+            $this->markTestSkipped(
+                'recursion_limit range validation is C-extension only');
+        }
+
+        $payload = $this->makeRecursiveMessage(2)->serializeToString();
+
+        $threwNegative = false;
+        try {
+            (new TestMessage())->mergeFromString($payload, -1);
+        } catch (Exception $e) {
+            $threwNegative = true;
+        }
+        $this->assertTrue($threwNegative, 'a negative recursion_limit must throw');
+
+        $threwTooLarge = false;
+        try {
+            $this->makeRecursiveMessage(2)->serializeToString(70000);
+        } catch (Exception $e) {
+            $threwTooLarge = true;
+        }
+        $this->assertTrue($threwTooLarge, 'recursion_limit > 65535 must throw');
     }
 }

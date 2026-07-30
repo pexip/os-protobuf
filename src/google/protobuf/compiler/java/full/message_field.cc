@@ -15,12 +15,14 @@
 
 #include "absl/log/absl_check.h"
 #include "absl/strings/str_cat.h"
+#include "absl/types/optional.h"
 #include "google/protobuf/compiler/java/context.h"
 #include "google/protobuf/compiler/java/doc_comment.h"
 #include "google/protobuf/compiler/java/field_common.h"
 #include "google/protobuf/compiler/java/helpers.h"
 #include "google/protobuf/compiler/java/name_resolver.h"
 #include "google/protobuf/io/printer.h"
+#include "google/protobuf/wire_format.h"
 
 // Must be last.
 #include "google/protobuf/port_def.inc"
@@ -43,8 +45,6 @@ void SetMessageVariables(
 
   (*variables)["type"] =
       name_resolver->GetImmutableClassName(descriptor->message_type());
-  (*variables)["mutable_type"] =
-      name_resolver->GetMutableClassName(descriptor->message_type());
   (*variables)["group_or_message"] =
       (GetType(descriptor) == FieldDescriptor::TYPE_GROUP) ? "Group"
                                                            : "Message";
@@ -80,6 +80,9 @@ void SetMessageVariables(
       absl::StrCat(GenerateClearBit(builderBitIndex), ";");
   (*variables)["get_has_field_bit_from_local"] =
       GenerateGetBitFromLocal(builderBitIndex);
+
+  (*variables)["tag_size"] = absl::StrCat(
+      internal::WireFormat::TagSize(descriptor->number(), GetType(descriptor)));
 }
 
 }  // namespace
@@ -99,7 +102,7 @@ ImmutableMessageFieldGenerator::ImmutableMessageFieldGenerator(
                       name_resolver_, &variables_, context);
 }
 
-ImmutableMessageFieldGenerator::~ImmutableMessageFieldGenerator() {}
+ImmutableMessageFieldGenerator::~ImmutableMessageFieldGenerator() = default;
 
 int ImmutableMessageFieldGenerator::GetMessageBitIndex() const {
   return message_bit_index_;
@@ -240,9 +243,7 @@ void ImmutableMessageFieldGenerator::GenerateBuilderMembers(
       printer,
       "$deprecation$public Builder ${$set$capitalized_name$$}$($type$ value)",
 
-      "if (value == null) {\n"
-      "  throw new NullPointerException();\n"
-      "}\n"
+      "java.util.Objects.requireNonNull(value);\n"
       "$name$_ = value;\n",
 
       "$name$Builder_.setMessage(value);\n",
@@ -459,7 +460,8 @@ ImmutableMessageOneofFieldGenerator::ImmutableMessageOneofFieldGenerator(
   SetCommonOneofVariables(descriptor, info, &variables_);
 }
 
-ImmutableMessageOneofFieldGenerator::~ImmutableMessageOneofFieldGenerator() {}
+ImmutableMessageOneofFieldGenerator::~ImmutableMessageOneofFieldGenerator() =
+    default;
 
 void ImmutableMessageOneofFieldGenerator::GenerateMembers(
     io::Printer* printer) const {
@@ -549,9 +551,7 @@ void ImmutableMessageOneofFieldGenerator::GenerateBuilderMembers(
       printer,
       "$deprecation$public Builder ${$set$capitalized_name$$}$($type$ value)",
 
-      "if (value == null) {\n"
-      "  throw new NullPointerException();\n"
-      "}\n"
+      "java.util.Objects.requireNonNull(value);\n"
       "$oneof_name$_ = value;\n"
       "$on_changed$\n",
 
@@ -743,7 +743,7 @@ RepeatedImmutableMessageFieldGenerator::RepeatedImmutableMessageFieldGenerator(
                                      builderBitIndex, context) {}
 
 RepeatedImmutableMessageFieldGenerator::
-    ~RepeatedImmutableMessageFieldGenerator() {}
+    ~RepeatedImmutableMessageFieldGenerator() = default;
 
 int RepeatedImmutableMessageFieldGenerator::GetNumBitsForMessage() const {
   return 0;
@@ -783,8 +783,9 @@ void RepeatedImmutableMessageFieldGenerator::GenerateInterfaceMembers(
 
 void RepeatedImmutableMessageFieldGenerator::GenerateMembers(
     io::Printer* printer) const {
-  printer->Print(variables_, "@SuppressWarnings(\"serial\")\n"
-                             "private java.util.List<$type$> $name$_;\n");
+  printer->Print(variables_,
+                 "@SuppressWarnings(\"serial\")\n"
+                 "private java.util.List<$type$> $name$_;\n");
   PrintExtraFieldInfo(variables_, printer);
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(variables_,
@@ -948,9 +949,7 @@ void RepeatedImmutableMessageFieldGenerator::GenerateBuilderMembers(
       printer,
       "$deprecation$public Builder ${$set$capitalized_name$$}$(\n"
       "    int index, $type$ value)",
-      "if (value == null) {\n"
-      "  throw new NullPointerException();\n"
-      "}\n"
+      "java.util.Objects.requireNonNull(value);\n"
       "ensure$capitalized_name$IsMutable();\n"
       "$name$_.set(index, value);\n"
       "$on_changed$\n",
@@ -978,9 +977,7 @@ void RepeatedImmutableMessageFieldGenerator::GenerateBuilderMembers(
       printer,
       "$deprecation$public Builder ${$add$capitalized_name$$}$($type$ value)",
 
-      "if (value == null) {\n"
-      "  throw new NullPointerException();\n"
-      "}\n"
+      "java.util.Objects.requireNonNull(value);\n"
       "ensure$capitalized_name$IsMutable();\n"
       "$name$_.add(value);\n"
 
@@ -997,9 +994,7 @@ void RepeatedImmutableMessageFieldGenerator::GenerateBuilderMembers(
       "$deprecation$public Builder ${$add$capitalized_name$$}$(\n"
       "    int index, $type$ value)",
 
-      "if (value == null) {\n"
-      "  throw new NullPointerException();\n"
-      "}\n"
+      "java.util.Objects.requireNonNull(value);\n"
       "ensure$capitalized_name$IsMutable();\n"
       "$name$_.add(index, value);\n"
       "$on_changed$\n",
@@ -1275,12 +1270,17 @@ void RepeatedImmutableMessageFieldGenerator::GenerateSerializationCode(
 
 void RepeatedImmutableMessageFieldGenerator::GenerateSerializedSizeCode(
     io::Printer* printer) const {
-  printer->Print(
-      variables_,
-      "for (int i = 0; i < $name$_.size(); i++) {\n"
-      "  size += com.google.protobuf.CodedOutputStream\n"
-      "    .compute$group_or_message$Size($number$, $name$_.get(i));\n"
-      "}\n");
+  printer->Print(variables_,
+                 R"java(
+    {
+      final int count = $name$_.size();
+      for (int i = 0; i < count; i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .compute$group_or_message$SizeNoTag($name$_.get(i));
+      }
+      size += $tag_size$ * count;
+    }
+    )java");
 }
 
 void RepeatedImmutableMessageFieldGenerator::GenerateEqualsCode(

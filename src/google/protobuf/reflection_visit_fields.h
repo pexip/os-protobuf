@@ -14,6 +14,7 @@
 #include "google/protobuf/descriptor_lite.h"
 #include "google/protobuf/extension_set.h"
 #include "google/protobuf/generated_message_reflection.h"
+#include "google/protobuf/has_bits.h"
 #include "google/protobuf/message.h"
 #include "google/protobuf/port.h"
 #include "google/protobuf/reflection.h"
@@ -49,8 +50,6 @@ inline FieldMask operator|(FieldMask lhs, FieldMask rhs) {
   return static_cast<FieldMask>(static_cast<uint32_t>(lhs) |
                                 static_cast<uint32_t>(rhs));
 }
-
-#ifdef __cpp_if_constexpr
 
 template <typename MessageT, typename CallbackFn>
 void VisitFields(MessageT& message, CallbackFn&& func,
@@ -101,27 +100,28 @@ void ReflectionVisit::VisitFields(MessageT& message, CallbackFn&& func,
   // See Reflection::ListFields for the optimization.
   const uint32_t* const has_bits =
       schema.HasHasbits() ? reflection->GetHasBits(message) : nullptr;
-  const uint32_t* const has_bits_indices = schema.has_bit_indices_;
   const Descriptor* descriptor = GetDescriptor(reflection);
   const int field_count = descriptor->field_count();
 
   for (int i = 0; i < field_count; i++) {
     const FieldDescriptor* field = descriptor->field(i);
+    PROTOBUF_IGNORE_DEPRECATION_START
     ABSL_DCHECK(!field->options().weak()) << "weak fields are not supported";
+    PROTOBUF_IGNORE_DEPRECATION_STOP
 
     if (!ShouldVisit(mask, field->cpp_type())) continue;
 
     if (field->is_repeated()) {
       switch (field->type()) {
-#define PROTOBUF_HANDLE_REPEATED_CASE(TYPE, CPPTYPE, NAME)                  \
-  case FieldDescriptor::TYPE_##TYPE: {                                      \
-    ABSL_DCHECK(!field->is_map());                                          \
-    const auto& rep =                                                       \
-        reflection->GetRawNonOneof<RepeatedField<CPPTYPE>>(message, field); \
-    if (rep.size() == 0) continue;                                          \
-    func(internal::Repeated##NAME##DynamicFieldInfo<MessageT>{              \
-        reflection, message, field, rep});                                  \
-    break;                                                                  \
+#define PROTOBUF_HANDLE_REPEATED_CASE(TYPE, CPPTYPE, NAME)          \
+  case FieldDescriptor::TYPE_##TYPE: {                              \
+    ABSL_DCHECK(!field->is_map());                                  \
+    const auto& rep =                                               \
+        reflection->GetRaw<RepeatedField<CPPTYPE>>(message, field); \
+    if (rep.size() == 0) continue;                                  \
+    func(internal::Repeated##NAME##DynamicFieldInfo<MessageT>{      \
+        reflection, message, field, rep});                          \
+    break;                                                          \
   }
 
         PROTOBUF_HANDLE_REPEATED_CASE(DOUBLE, double, Double);
@@ -143,15 +143,14 @@ void ReflectionVisit::VisitFields(MessageT& message, CallbackFn&& func,
   case FieldDescriptor::TYPE_##TYPE: {                                         \
     if (ABSL_PREDICT_TRUE(!field->is_map())) {                                 \
       /* Handle repeated fields. */                                            \
-      const auto& rep = reflection->GetRawNonOneof<RepeatedPtrField<CPPTYPE>>( \
-          message, field);                                                     \
+      const auto& rep =                                                        \
+          reflection->GetRaw<RepeatedPtrField<CPPTYPE>>(message, field);       \
       if (rep.size() == 0) continue;                                           \
       func(internal::Repeated##NAME##DynamicFieldInfo<MessageT>{               \
           reflection, message, field, rep});                                   \
     } else {                                                                   \
       /* Handle map fields. */                                                 \
-      const auto& map =                                                        \
-          reflection->GetRawNonOneof<MapFieldBase>(message, field);            \
+      const auto& map = reflection->GetRaw<MapFieldBase>(message, field);      \
       if (map.size() == 0) continue; /* NOLINT */                              \
       const Descriptor* desc = field->message_type();                          \
       func(internal::MapDynamicFieldInfo<MessageT>{reflection, message, field, \
@@ -166,13 +165,13 @@ void ReflectionVisit::VisitFields(MessageT& message, CallbackFn&& func,
 
         case FieldDescriptor::TYPE_BYTES:
         case FieldDescriptor::TYPE_STRING:
-#define PROTOBUF_IMPL_STRING_CASE(CPPTYPE, NAME)                               \
-  {                                                                            \
-    const auto& rep =                                                          \
-        reflection->GetRawNonOneof<RepeatedPtrField<CPPTYPE>>(message, field); \
-    if (rep.size() == 0) continue;                                             \
-    func(internal::Repeated##NAME##DynamicFieldInfo<MessageT>{                 \
-        reflection, message, field, rep});                                     \
+#define PROTOBUF_IMPL_STRING_CASE(CPPTYPE, NAME)                       \
+  {                                                                    \
+    const auto& rep =                                                  \
+        reflection->GetRaw<RepeatedPtrField<CPPTYPE>>(message, field); \
+    if (rep.size() == 0) continue;                                     \
+    func(internal::Repeated##NAME##DynamicFieldInfo<MessageT>{         \
+        reflection, message, field, rep});                             \
   }
 
           switch (field->cpp_string_type()) {
@@ -192,12 +191,10 @@ void ReflectionVisit::VisitFields(MessageT& message, CallbackFn&& func,
 #undef PROTOBUF_IMPL_STRING_CASE
     } else if (schema.InRealOneof(field)) {
       const OneofDescriptor* containing_oneof = field->containing_oneof();
-      const uint32_t* const oneof_case_array =
-          internal::GetConstPointerAtOffset<uint32_t>(
-              &message, schema.oneof_case_offset_);
+      uint32_t oneof_case = internal::GetConstRefAtOffset<uint32_t>(
+          message, schema.GetOneofCaseOffset(containing_oneof));
       // Equivalent to: !HasOneofField(message, field)
-      if (static_cast<int64_t>(oneof_case_array[containing_oneof->index()]) !=
-          field->number()) {
+      if (static_cast<int64_t>(oneof_case) != field->number()) {
         continue;
       }
       switch (field->type()) {
@@ -248,13 +245,14 @@ void ReflectionVisit::VisitFields(MessageT& message, CallbackFn&& func,
 #undef PROTOBUF_HANDLE_CASE
       }
     } else {
-      auto index = has_bits_indices[i];
-      bool check_hasbits = has_bits && index != static_cast<uint32_t>(-1);
+      uint32_t index = schema.HasBitIndex(field, /*field_index=*/i);
+      bool check_hasbits =
+          has_bits && index != static_cast<uint32_t>(kNoHasbit);
       if (ABSL_PREDICT_TRUE(check_hasbits)) {
         if ((has_bits[index / 32] & (1u << (index % 32))) == 0) continue;
       } else {
         // Skip if it has default values.
-        if (!reflection->HasFieldSingular(message, field)) continue;
+        if (!reflection->HasFieldWithHasbits(message, field)) continue;
       }
       switch (field->type()) {
 #define PROTOBUF_HANDLE_CASE(TYPE, NAME)                                     \
@@ -502,8 +500,6 @@ template <typename CallbackFn>
 void VisitMutableMessageFields(Message& message, CallbackFn&& func) {
   ReflectionVisit::VisitMessageFields(message, std::forward<CallbackFn>(func));
 }
-
-#endif  // __cpp_if_constexpr
 
 }  // namespace internal
 }  // namespace protobuf

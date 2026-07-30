@@ -5,6 +5,11 @@
 // license that can be found in the LICENSE file or at
 // https://developers.google.com/open-source/licenses/bsd
 
+#[cfg(not(bzl))]
+mod protos;
+#[cfg(not(bzl))]
+use protos::*;
+
 use googletest::prelude::*;
 
 // Tests that an proto file that declares edition="2023" works. Note that this
@@ -14,7 +19,7 @@ use googletest::prelude::*;
 #[gtest]
 fn check_edition2023_works() {
     let msg = edition2023_rust_proto::EditionsMessage::new();
-    assert_that!(msg.plain_field_opt().into_inner(), eq(0));
+    assert_that!(msg.plain_field_opt(), eq(None));
     assert_that!(msg.implicit_presence_field(), eq(0));
 }
 

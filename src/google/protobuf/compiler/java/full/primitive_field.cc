@@ -112,8 +112,7 @@ void SetPrimitiveVariables(
   (*variables)["tag_size"] = absl::StrCat(
       WireFormat::TagSize(descriptor->number(), GetType(descriptor)));
   if (IsReferenceType(GetJavaType(descriptor))) {
-    (*variables)["null_check"] =
-        "if (value == null) { throw new NullPointerException(); }";
+    (*variables)["null_check"] = "java.util.Objects.requireNonNull(value);";
   } else {
     (*variables)["null_check"] = "";
   }
@@ -204,7 +203,7 @@ ImmutablePrimitiveFieldGenerator::ImmutablePrimitiveFieldGenerator(
                         name_resolver_, &variables_, context);
 }
 
-ImmutablePrimitiveFieldGenerator::~ImmutablePrimitiveFieldGenerator() {}
+ImmutablePrimitiveFieldGenerator::~ImmutablePrimitiveFieldGenerator() = default;
 
 int ImmutablePrimitiveFieldGenerator::GetMessageBitIndex() const {
   return message_bit_index_;
@@ -494,7 +493,7 @@ ImmutablePrimitiveOneofFieldGenerator::ImmutablePrimitiveOneofFieldGenerator(
 }
 
 ImmutablePrimitiveOneofFieldGenerator::
-    ~ImmutablePrimitiveOneofFieldGenerator() {}
+    ~ImmutablePrimitiveOneofFieldGenerator() = default;
 
 void ImmutablePrimitiveOneofFieldGenerator::GenerateMembers(
     io::Printer* printer) const {
@@ -644,7 +643,7 @@ RepeatedImmutablePrimitiveFieldGenerator::
                                        builder_bit_index, context) {}
 
 RepeatedImmutablePrimitiveFieldGenerator::
-    ~RepeatedImmutablePrimitiveFieldGenerator() {}
+    ~RepeatedImmutablePrimitiveFieldGenerator() = default;
 
 int RepeatedImmutablePrimitiveFieldGenerator::GetNumBitsForMessage() const {
   return 0;

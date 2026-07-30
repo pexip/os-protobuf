@@ -15,6 +15,7 @@
 #include <string>
 
 #include "absl/strings/str_cat.h"
+#include "google/protobuf/compiler/code_generator_lite.h"
 #include "google/protobuf/compiler/java/context.h"
 #include "google/protobuf/compiler/java/doc_comment.h"
 #include "google/protobuf/compiler/java/field_common.h"
@@ -44,8 +45,6 @@ void SetMessageVariables(
 
   (*variables)["type"] =
       name_resolver->GetImmutableClassName(descriptor->message_type());
-  (*variables)["mutable_type"] =
-      name_resolver->GetMutableClassName(descriptor->message_type());
   (*variables)["group_or_message"] =
       (GetType(descriptor) == FieldDescriptor::TYPE_GROUP) ? "Group"
                                                            : "Message";
@@ -97,7 +96,8 @@ ImmutableMessageFieldLiteGenerator::ImmutableMessageFieldLiteGenerator(
                       name_resolver_, &variables_, context);
 }
 
-ImmutableMessageFieldLiteGenerator::~ImmutableMessageFieldLiteGenerator() {}
+ImmutableMessageFieldLiteGenerator::~ImmutableMessageFieldLiteGenerator() =
+    default;
 
 int ImmutableMessageFieldLiteGenerator::GetNumBitsForMessage() const {
   // TODO: We don't need a has bit for messages as they have null
@@ -146,9 +146,8 @@ void ImmutableMessageFieldLiteGenerator::GenerateMembers(
   // Field.Builder setField(Field value)
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(variables_,
-                 "@java.lang.SuppressWarnings(\"ReturnValueIgnored\")\n"
                  "private void set$capitalized_name$($type$ value) {\n"
-                 "  value.getClass();  // minimal bytecode null check\n"
+                 "  java.util.Objects.requireNonNull(value);\n"
                  "  $name$_ = value;\n"
                  "  $set_has_field_bit_message$\n"
                  "}\n");
@@ -157,10 +156,9 @@ void ImmutableMessageFieldLiteGenerator::GenerateMembers(
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(
       variables_,
-      "@java.lang.SuppressWarnings({\"ReferenceEquality\", "
-      "\"ReturnValueIgnored\"})\n"
+      "@java.lang.SuppressWarnings(\"ReferenceEquality\")\n"
       "private void merge$capitalized_name$($type$ value) {\n"
-      "  value.getClass();  // minimal bytecode null check\n"
+      "  java.util.Objects.requireNonNull(value);\n"
       "  if ($name$_ != null &&\n"
       "      $name$_ != $type$.getDefaultInstance()) {\n"
       "    $name$_ =\n"
@@ -278,7 +276,7 @@ ImmutableMessageOneofFieldLiteGenerator::
 }
 
 ImmutableMessageOneofFieldLiteGenerator::
-    ~ImmutableMessageOneofFieldLiteGenerator() {}
+    ~ImmutableMessageOneofFieldLiteGenerator() = default;
 
 void ImmutableMessageOneofFieldLiteGenerator::GenerateMembers(
     io::Printer* printer) const {
@@ -304,9 +302,8 @@ void ImmutableMessageOneofFieldLiteGenerator::GenerateMembers(
   // Field.Builder setField(Field value)
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(variables_,
-                 "@java.lang.SuppressWarnings(\"ReturnValueIgnored\")\n"
                  "private void set$capitalized_name$($type$ value) {\n"
-                 "  value.getClass();  // minimal bytecode null check\n"
+                 "  java.util.Objects.requireNonNull(value);\n"
                  "  $oneof_name$_ = value;\n"
                  "  $set_oneof_case_message$;\n"
                  "}\n");
@@ -315,9 +312,8 @@ void ImmutableMessageOneofFieldLiteGenerator::GenerateMembers(
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(
       variables_,
-      "@java.lang.SuppressWarnings(\"ReturnValueIgnored\")\n"
       "private void merge$capitalized_name$($type$ value) {\n"
-      "  value.getClass();  // minimal bytecode null check\n"
+      "  java.util.Objects.requireNonNull(value);\n"
       "  if ($has_oneof_case_message$ &&\n"
       "      $oneof_name$_ != $type$.getDefaultInstance()) {\n"
       "    $oneof_name$_ = $type$.newBuilder(($type$) $oneof_name$_)\n"
@@ -431,7 +427,7 @@ RepeatedImmutableMessageFieldLiteGenerator::
 }
 
 RepeatedImmutableMessageFieldLiteGenerator::
-    ~RepeatedImmutableMessageFieldLiteGenerator() {}
+    ~RepeatedImmutableMessageFieldLiteGenerator() = default;
 
 int RepeatedImmutableMessageFieldLiteGenerator::GetNumBitsForMessage() const {
   return 0;
@@ -521,10 +517,9 @@ void RepeatedImmutableMessageFieldLiteGenerator::GenerateMembers(
   // Builder setRepeatedField(int index, Field value)
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(variables_,
-                 "@java.lang.SuppressWarnings(\"ReturnValueIgnored\")\n"
                  "private void set$capitalized_name$(\n"
                  "    int index, $type$ value) {\n"
-                 "  value.getClass();  // minimal bytecode null check\n"
+                 "  java.util.Objects.requireNonNull(value);\n"
                  "  ensure$capitalized_name$IsMutable();\n"
                  "  $name$_.set(index, value);\n"
                  "}\n");
@@ -532,9 +527,8 @@ void RepeatedImmutableMessageFieldLiteGenerator::GenerateMembers(
   // Builder addRepeatedField(Field value)
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(variables_,
-                 "@java.lang.SuppressWarnings(\"ReturnValueIgnored\")\n"
                  "private void add$capitalized_name$($type$ value) {\n"
-                 "  value.getClass();  // minimal bytecode null check\n"
+                 "  java.util.Objects.requireNonNull(value);\n"
                  "  ensure$capitalized_name$IsMutable();\n"
                  "  $name$_.add(value);\n"
                  "}\n");
@@ -542,10 +536,9 @@ void RepeatedImmutableMessageFieldLiteGenerator::GenerateMembers(
   // Builder addRepeatedField(int index, Field value)
   WriteFieldDocComment(printer, descriptor_, context_->options());
   printer->Print(variables_,
-                 "@java.lang.SuppressWarnings(\"ReturnValueIgnored\")\n"
                  "private void add$capitalized_name$(\n"
                  "    int index, $type$ value) {\n"
-                 "  value.getClass();  // minimal bytecode null check\n"
+                 "  java.util.Objects.requireNonNull(value);\n"
                  "  ensure$capitalized_name$IsMutable();\n"
                  "  $name$_.add(index, value);\n"
                  "}\n");

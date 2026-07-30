@@ -1,6 +1,8 @@
 # Don't run jsoncpp tests.
 set(JSONCPP_WITH_TESTS OFF)
 
+include(${protobuf_SOURCE_DIR}/src/file_lists.cmake)
+
 if (NOT TARGET jsoncpp_lib)
   if (NOT protobuf_FORCE_FETCH_DEPENDENCIES)
     find_package(jsoncpp)
@@ -36,12 +38,16 @@ add_custom_command(
     ${protobuf_BINARY_DIR}/conformance/conformance.pb.cc
     ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition2023.pb.h
     ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition2023.pb.cc
+    ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition_unstable.pb.h
+    ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition_unstable.pb.cc
   DEPENDS ${protobuf_PROTOC_EXE}
     ${protobuf_SOURCE_DIR}/conformance/conformance.proto
     ${protobuf_SOURCE_DIR}/conformance/test_protos/test_messages_edition2023.proto
+    ${protobuf_SOURCE_DIR}/conformance/test_protos/test_messages_edition_unstable.proto
   COMMAND ${protobuf_PROTOC_EXE}
       ${protobuf_SOURCE_DIR}/conformance/conformance.proto
       ${protobuf_SOURCE_DIR}/conformance/test_protos/test_messages_edition2023.proto
+      ${protobuf_SOURCE_DIR}/conformance/test_protos/test_messages_edition_unstable.proto
       --proto_path=${protobuf_SOURCE_DIR}
       --cpp_out=${protobuf_BINARY_DIR}
 )
@@ -87,6 +93,8 @@ add_library(libconformance_common STATIC
   ${protobuf_BINARY_DIR}/conformance/conformance.pb.cc
   ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition2023.pb.h
   ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition2023.pb.cc
+  ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition_unstable.pb.h
+  ${protobuf_BINARY_DIR}/conformance/test_protos/test_messages_edition_unstable.pb.cc
   ${protobuf_BINARY_DIR}/editions/golden/test_messages_proto3_editions.pb.h
   ${protobuf_BINARY_DIR}/editions/golden/test_messages_proto3_editions.pb.cc
   ${protobuf_BINARY_DIR}/editions/golden/test_messages_proto2_editions.pb.h
@@ -102,19 +110,13 @@ target_link_libraries(libconformance_common
 )
 
 add_executable(conformance_test_runner
-  ${protobuf_SOURCE_DIR}/conformance/binary_json_conformance_suite.cc
-  ${protobuf_SOURCE_DIR}/conformance/binary_json_conformance_suite.h
-  ${protobuf_SOURCE_DIR}/conformance/conformance_test.cc
-  ${protobuf_SOURCE_DIR}/conformance/conformance_test_runner.cc
-  ${protobuf_SOURCE_DIR}/conformance/conformance_test_main.cc
-  ${protobuf_SOURCE_DIR}/conformance/text_format_conformance_suite.cc
-  ${protobuf_SOURCE_DIR}/conformance/text_format_conformance_suite.h
-  ${protobuf_SOURCE_DIR}/conformance/failure_list_trie_node.cc
-  ${protobuf_SOURCE_DIR}/conformance/failure_list_trie_node.h
+  ${conformance_runner_srcs}
+  ${conformance_runner_hdrs}
 )
 
 add_executable(conformance_cpp
-  ${protobuf_SOURCE_DIR}/conformance/conformance_cpp.cc
+  ${conformance_testee_srcs}
+  ${conformance_testee_hdrs}
 )
 
 target_include_directories(

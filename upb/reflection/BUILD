@@ -5,12 +5,14 @@
 # license that can be found in the LICENSE file or at
 # https://developers.google.com/open-source/licenses/bsd
 
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_library")
 load(
     "//editions:defaults.bzl",
     "compile_edition_defaults",
     "embed_edition_defaults",
 )
-load("//upb/bazel:build_defs.bzl", "UPB_DEFAULT_COPTS")
+load("//upb/bazel:copts.bzl", "UPB_DEFAULT_COPTS", "UPB_DEFAULT_FEATURES")
 load(
     "//upb/cmake:build_defs.bzl",
     "staleness_test",
@@ -40,18 +42,27 @@ bootstrap_cc_library(
         "message.h",
         "message.hpp",
     ],
-    bootstrap_deps = [":internal"],
+    bootstrap_deps = [
+        ":internal",
+        ":descriptor_upb_proto",
+    ],
     copts = UPB_DEFAULT_COPTS,
+    features = UPB_DEFAULT_FEATURES,
     visibility = ["//visibility:public"],
     deps = [
-        "//upb:base",
-        "//upb:mem",
-        "//upb:message",
-        "//upb:mini_descriptor",
-        "//upb:mini_table",
-        "//upb:port",
+        "//upb/base",
+        "//upb/mem",
+        "//upb/message",
         "//upb/message:internal",
+        "//upb/mini_descriptor",
+        "//upb/mini_table",
+        "//upb/port",
     ],
+)
+
+alias(
+    name = "reflection_cc",
+    actual = ":reflection",
 )
 
 bootstrap_cc_library(
@@ -113,22 +124,28 @@ bootstrap_cc_library(
     ],
     bootstrap_deps = [":descriptor_upb_proto"],
     copts = UPB_DEFAULT_COPTS,
+    features = UPB_DEFAULT_FEATURES,
     visibility = ["//visibility:public"],
     deps = [
-        "//upb:base",
-        "//upb:mem",
-        "//upb:message",
-        "//upb:message_copy",
-        "//upb:mini_descriptor",
-        "//upb:mini_table",
-        "//upb:port",
-        "//upb:wire",
+        "//upb/base",
         "//upb/base:internal",
         "//upb/hash",
+        "//upb/mem",
+        "//upb/message",
+        "//upb/message:copy",
         "//upb/message:internal",
+        "//upb/mini_descriptor",
         "//upb/mini_descriptor:internal",
+        "//upb/mini_table",
         "//upb/mini_table:internal",
+        "//upb/port",
+        "//upb/wire",
     ],
+)
+
+alias(
+    name = "internal_cc",
+    actual = ":internal",
 )
 
 cc_library(
@@ -138,14 +155,15 @@ cc_library(
         "internal/def_pool.h",
     ],
     copts = UPB_DEFAULT_COPTS,
+    features = UPB_DEFAULT_FEATURES,
     textual_hdrs = [
-        "//upb:port_inc",
+        "//upb/port:inc",
     ],
-    visibility = ["//upb:__pkg__"],
+    visibility = ["//upb:friends"],
     deps = [
         ":internal",
-        "//upb:mem",
-        "//upb:mini_descriptor",
+        "//upb/mini_descriptor",
+        "//upb/mini_table",
     ],
 )
 
@@ -160,14 +178,39 @@ cc_test(
     deps = [
         ":descriptor_upb_proto",
         ":internal",
-        "//upb:base",
-        "//upb:mem",
-        "//upb:mini_descriptor",
-        "//upb:mini_table",
-        "//upb:port",
-        "//upb:reflection",
+        ":reflection",
+        "//upb/base",
         "//upb/hash",
+        "//upb/mem",
+        "//upb/mini_descriptor",
+        "//upb/mini_table",
+        "//upb/port",
         "@abseil-cpp//absl/strings",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "reflection_test",
+    srcs = [
+        "reflection_test.cc",
+    ],
+    deps = [
+        ":internal",
+        ":reflection",
+        "//src/google/protobuf",
+        "//src/google/protobuf:descriptor_upb_c_proto",
+        "//src/google/protobuf:unittest_upb_reflection_proto",
+        "//upb/base",
+        "//upb/mem",
+        "//upb/test:parse_text_proto",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:check",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/strings:str_format",
         "@googletest//:gtest",
         "@googletest//:gtest_main",
     ],
@@ -178,7 +221,7 @@ compile_edition_defaults(
     srcs = [
         "//:descriptor_proto",
     ],
-    maximum_edition = "2023",
+    maximum_edition = "2026",
     minimum_edition = "PROTO2",
 )
 

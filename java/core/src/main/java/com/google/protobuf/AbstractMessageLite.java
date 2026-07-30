@@ -22,13 +22,21 @@ import java.util.RandomAccess;
  * A partial implementation of the {@link MessageLite} interface which implements as many methods of
  * that interface as possible in terms of other methods.
  *
+ * <p>Users should generally ignore this class and use the MessageLite interface instead.
+ *
+ * <p>This class is intended to only be extended by protoc created gencode. It is not intended or
+ * supported to extend this class, and any protected methods may be removed without it being
+ * considered a breaking change as long as all supported gencode does not depend on the changed
+ * methods.
+ *
  * @author kenton@google.com Kenton Varda
  */
 public abstract class AbstractMessageLite<
         MessageType extends AbstractMessageLite<MessageType, BuilderType>,
         BuilderType extends AbstractMessageLite.Builder<MessageType, BuilderType>>
     implements MessageLite {
-  protected int memoizedHashCode = 0;
+  protected
+  int memoizedHashCode = 0;
 
   @Override
   public ByteString toByteString() {
@@ -84,6 +92,7 @@ public abstract class AbstractMessageLite<
     throw new UnsupportedOperationException();
   }
 
+  @SuppressWarnings({"rawtypes", "unchecked"})
   int getSerializedSize(
           Schema schema) {
     int memoizedSerializedSize = getMemoizedSerializedSize();
@@ -307,6 +316,9 @@ public abstract class AbstractMessageLite<
         return false;
       }
       final int size = CodedInputStream.readRawVarint32(firstByte, input);
+      if (size < 0) {
+        throw InvalidProtocolBufferException.negativeSize();
+      }
       final InputStream limitedInput = new LimitedInputStream(input, size);
       mergeFrom(limitedInput, extensionRegistry);
       return true;
@@ -320,11 +332,6 @@ public abstract class AbstractMessageLite<
     @Override
     @SuppressWarnings("unchecked") // isInstance takes care of this
     public BuilderType mergeFrom(final MessageLite other) {
-      if (!getDefaultInstanceForType().getClass().isInstance(other)) {
-        throw new IllegalArgumentException(
-            "mergeFrom(MessageLite) can only merge messages of the same type.");
-      }
-
       return internalMergeFrom((MessageType) other);
     }
 
