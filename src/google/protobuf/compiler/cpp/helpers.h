@@ -12,6 +12,8 @@
 #ifndef GOOGLE_PROTOBUF_COMPILER_CPP_HELPERS_H__
 #define GOOGLE_PROTOBUF_COMPILER_CPP_HELPERS_H__
 
+#include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <string>
 #include <tuple>
@@ -42,7 +44,7 @@ namespace google {
 namespace protobuf {
 namespace compiler {
 namespace cpp {
-enum class ArenaDtorNeeds { kNone = 0, kOnDemand = 1, kRequired = 2 };
+enum class ArenaDtorNeeds { kNone = 0, kRequired = 1 };
 
 inline absl::string_view ProtobufNamespace(const Options& opts) {
   // This won't be transformed by copybara, since copybara looks for google::protobuf::.
@@ -50,6 +52,13 @@ inline absl::string_view ProtobufNamespace(const Options& opts) {
   constexpr absl::string_view kOssNs = "google::protobuf";
 
   return opts.opensource_runtime ? kOssNs : kGoogle3Ns;
+}
+
+// A helper for calling FieldDescriptor::CalculateCppRepeatedType() which is
+// private.
+inline FieldDescriptor::CppRepeatedType CalculateFieldDescriptorRepeatedType(
+    const FieldDescriptor* field) {
+  return field->CalculateCppRepeatedType();
 }
 
 inline std::string DeprecatedAttribute(const Options&,
@@ -92,11 +101,13 @@ bool IsBootstrapProto(const Options& options, const FileDescriptor* file);
 // "<namespace>::some_name" is the correct fully qualified namespace.
 // This means if the package is empty the namespace is "", and otherwise
 // the namespace is "::foo::bar::...::baz" without trailing semi-colons.
-std::string Namespace(const FileDescriptor* d, const Options& options);
-std::string Namespace(const Descriptor* d, const Options& options);
-std::string Namespace(const FieldDescriptor* d, const Options& options);
-std::string Namespace(const EnumDescriptor* d, const Options& options);
+std::string Namespace(const FileDescriptor* d);
+std::string Namespace(const Descriptor* d);
+std::string Namespace(const FieldDescriptor* d);
+std::string Namespace(const EnumDescriptor* d);
 PROTOC_EXPORT std::string Namespace(const FileDescriptor* d);
+PROTOC_EXPORT bool ValidateCcNamespace(const FileDescriptor* file,
+                                       std::string* error);
 PROTOC_EXPORT std::string Namespace(const Descriptor* d);
 PROTOC_EXPORT std::string Namespace(const FieldDescriptor* d);
 PROTOC_EXPORT std::string Namespace(const EnumDescriptor* d);
@@ -105,13 +116,11 @@ class MessageSCCAnalyzer;
 
 // Returns true if it's safe to init "field" to zero.
 bool CanInitializeByZeroing(const FieldDescriptor* field,
-                            const Options& options,
-                            MessageSCCAnalyzer* scc_analyzer);
+                            const Options& options);
 // Returns true if it's safe to reset "field" to zero.
 bool CanClearByZeroing(const FieldDescriptor* field);
 // Determines if swap can be implemented via memcpy.
-bool HasTrivialSwap(const FieldDescriptor* field, const Options& options,
-                    MessageSCCAnalyzer* scc_analyzer);
+bool HasTrivialSwap(const FieldDescriptor* field, const Options& options);
 
 PROTOC_EXPORT std::string ClassName(const Descriptor* descriptor);
 PROTOC_EXPORT std::string ClassName(const EnumDescriptor* enum_descriptor);
@@ -151,27 +160,37 @@ std::string QualifiedExtensionName(const FieldDescriptor* d,
 std::string QualifiedExtensionName(const FieldDescriptor* d);
 
 // Type name of default instance.
-std::string DefaultInstanceType(const Descriptor* descriptor,
-                                const Options& options, bool split = false);
+std::string SplitDefaultInstanceType(const Descriptor* descriptor,
+                                     const Options& options);
 
 // Non-qualified name of the default_instance of this message.
-std::string DefaultInstanceName(const Descriptor* descriptor,
-                                const Options& options, bool split = false);
+std::string SplitDefaultInstanceName(const Descriptor* descriptor,
+                                     const Options& options);
+
+// Type name of globals instance.
+std::string MsgGlobalsInstanceType(const Descriptor* descriptor,
+                                   const Options& options);
+
+// Non-qualified name of the globals instance of this message.
+std::string MsgGlobalsInstanceName(const Descriptor* descriptor,
+                                   const Options& options);
 
 // Non-qualified name of the default instance pointer. This is used only for
 // implicit weak fields, where we need an extra indirection.
-std::string DefaultInstancePtr(const Descriptor* descriptor,
-                               const Options& options, bool split = false);
+std::string MsgGlobalsInstancePtr(const Descriptor* descriptor,
+                                  const Options& options);
 
 // Fully qualified name of the default_instance of this message.
-std::string QualifiedDefaultInstanceName(const Descriptor* descriptor,
-                                         const Options& options,
-                                         bool split = false);
+std::string QualifiedSplitDefaultInstanceName(const Descriptor* descriptor,
+                                              const Options& options);
+
+// Fully qualified name of the globals instance of this message.
+std::string QualifiedMsgGlobalsInstanceName(const Descriptor* descriptor,
+                                            const Options& options);
 
 // Fully qualified name of the default instance pointer.
-std::string QualifiedDefaultInstancePtr(const Descriptor* descriptor,
-                                        const Options& options,
-                                        bool split = false);
+std::string QualifiedMsgGlobalsInstancePtr(const Descriptor* descriptor,
+                                           const Options& options);
 
 // Name of the ClassData subclass used for a message.
 std::string ClassDataType(const Descriptor* descriptor, const Options& options);
@@ -183,10 +202,6 @@ std::string DescriptorTableName(const FileDescriptor* file,
 // When declaring symbol externs from another file, this macro will supply the
 // dllexport needed for the target file, if any.
 std::string FileDllExport(const FileDescriptor* file, const Options& options);
-
-// Name of the base class: google::protobuf::Message or google::protobuf::MessageLite.
-std::string SuperClassName(const Descriptor* descriptor,
-                           const Options& options);
 
 // Add an underscore if necessary to prevent conflicting with known names and
 // keywords.
@@ -339,7 +354,9 @@ inline bool UseUnknownFieldSet(const FileDescriptor* file,
 }
 
 inline bool IsWeak(const FieldDescriptor* field, const Options& options) {
+  PROTOBUF_IGNORE_DEPRECATION_START
   if (field->options().weak()) {
+    PROTOBUF_IGNORE_DEPRECATION_STOP
     ABSL_CHECK(!options.opensource_runtime);
     return true;
   }
@@ -358,10 +375,14 @@ inline bool IsString(const FieldDescriptor* field) {
 }
 
 
-inline bool IsArenaStringPtr(const FieldDescriptor* field) {
-  return field->cpp_string_type() == FieldDescriptor::CppStringType::kString ||
-         field->cpp_string_type() == FieldDescriptor::CppStringType::kView;
-}
+bool IsArenaStringPtr(const FieldDescriptor* field, const Options& opts);
+bool IsMicroString(const FieldDescriptor* field, const Options& opts);
+
+// If the field is MicroString and has a non-default SSO size, return it.
+// Otherwise, return nullopt.
+// The SSO size can come from pdproto profile, or from test overrides.
+absl::optional<uint8_t> MicroStringSSOSize(const FieldDescriptor* field,
+                                           const Options& opts);
 
 bool IsProfileDriven(const Options& options);
 
@@ -382,10 +403,19 @@ absl::optional<float> GetPresenceProbability(const FieldDescriptor* field,
 absl::optional<float> GetFieldGroupPresenceProbability(
     const std::vector<const FieldDescriptor*>& fields, const Options& options);
 
+// Returns the "hasbit mode" of the field, which may depend on profile data.
+internal::cpp::HasbitMode GetFieldHasbitMode(const FieldDescriptor* field,
+                                             const Options& options);
+
+// Returns true if there are hasbits for the field, which may depend on profile
+// data.
+PROTOC_EXPORT bool HasHasbit(const FieldDescriptor* field,
+                             const Options& options);
+
 bool IsStringInliningEnabled(const Options& options);
 
 // Returns true if the provided field is a singular string and can be inlined.
-bool CanStringBeInlined(const FieldDescriptor* field);
+bool CanStringBeInlined(const FieldDescriptor* field, const Options& options);
 
 // Returns true if `field` is a string field that can and should be inlined
 // based on PDProto profile.
@@ -400,12 +430,10 @@ inline bool IsFieldInlined(const FieldDescriptor* field,
 }
 
 // Does the given FileDescriptor use lazy fields?
-bool HasLazyFields(const FileDescriptor* file, const Options& options,
-                   MessageSCCAnalyzer* scc_analyzer);
+bool HasLazyFields(const FileDescriptor* file, const Options& options);
 
 // Is the given field a supported lazy field?
-bool IsLazy(const FieldDescriptor* field, const Options& options,
-            MessageSCCAnalyzer* scc_analyzer);
+bool IsLazy(const FieldDescriptor* field, const Options& options);
 
 // Is this an explicit (non-profile driven) lazy field, as denoted by
 // lazy/unverified_lazy in the descriptor?
@@ -422,18 +450,15 @@ inline bool IsExplicitLazy(const FieldDescriptor* field) {
 }
 
 internal::field_layout::TransformValidation GetLazyStyle(
-    const FieldDescriptor* field, const Options& options,
-    MessageSCCAnalyzer* scc_analyzer);
+    const FieldDescriptor* field, const Options& options);
 
-bool IsEagerlyVerifiedLazy(const FieldDescriptor* field, const Options& options,
-                           MessageSCCAnalyzer* scc_analyzer);
+bool IsEagerlyVerifiedLazy(const FieldDescriptor* field,
+                           const Options& options);
 
 bool IsLazilyVerifiedLazy(const FieldDescriptor* field, const Options& options);
 
-bool ShouldVerify(const Descriptor* descriptor, const Options& options,
-                  MessageSCCAnalyzer* scc_analyzer);
-bool ShouldVerify(const FileDescriptor* file, const Options& options,
-                  MessageSCCAnalyzer* scc_analyzer);
+bool ShouldVerify(const Descriptor* descriptor, const Options& options);
+bool ShouldVerify(const FileDescriptor* file, const Options& options);
 bool ShouldVerifyRecursively(const FieldDescriptor* field);
 
 // Indicates whether to use predefined verify methods for a given message. If a
@@ -478,10 +503,12 @@ const FieldDescriptor* FindHottestField(
 // Does the file contain any definitions that need extension_set.h?
 bool HasExtensionsOrExtendableMessage(const FileDescriptor* file);
 
-// Does the file have any repeated fields, necessitating the file to include
-// repeated_field.h? This does not include repeated extensions, since those are
-// all stored internally in an ExtensionSet, not a separate RepeatedField*.
-bool HasRepeatedFields(const FileDescriptor* file);
+// Does the file have any repeated fields matching the given repeated type,
+// necessitating the file to include repeated_field.h/repeated_field_proxy.h?
+// This does not include repeated extensions, since those are all stored
+// internally in an ExtensionSet, not a separate RepeatedField*.
+bool HasRepeatedFields(const FileDescriptor* file,
+                       FieldDescriptor::CppRepeatedType cpp_repeated_type);
 
 // Does the file have any string/bytes fields with ctype=STRING_PIECE? This
 // does not include extensions, since ctype is ignored for extensions.
@@ -501,16 +528,6 @@ bool HasMapFields(const FileDescriptor* file);
 
 // Does this file have any enum type definitions?
 bool HasEnumDefinitions(const FileDescriptor* file);
-
-// Returns true if any message in the file can have v2 table.
-bool HasV2MessageTable(const FileDescriptor* file, const Options& options);
-bool HasV2ParseTable(const FileDescriptor* file, const Options& options);
-
-bool IsV2ParseEnabledForMessage(const Descriptor* descriptor);
-
-// Returns true if a message (descriptor) can have v2 table.
-bool IsV2EnabledForMessage(const Descriptor* descriptor,
-                           const Options& options);
 
 // Does this file have generated parsing, serialization, and other
 // standard methods for which reflection-based fallback implementations exist?
@@ -548,6 +565,15 @@ inline bool IsMapEntryMessage(const Descriptor* descriptor) {
 
 // Returns true if the field's CPPTYPE is string or message.
 bool IsStringOrMessage(const FieldDescriptor* field);
+
+// Returns true if the field will be internally represented as a
+// `RepeatedPtrField`. This is true for message and string repeated fields, with
+// the exception of repeated cords.
+//
+// Note that this returns false for map fields, even though they use a
+// `RepeatedPtrField` internally for some reflection API methods. This method is
+// mainly used to inform how a field's constructor should be invoked.
+bool IsRepeatedPtrField(const FieldDescriptor* field);
 
 std::string UnderscoresToCamelCase(absl::string_view input,
                                    bool cap_next_letter);
@@ -732,6 +758,10 @@ void ListAllFields(const Descriptor* d,
 void ListAllFields(const FileDescriptor* d,
                    std::vector<const FieldDescriptor*>* fields);
 
+// Returns true if the field's position in the message is chosen by the layout
+// optimizer.
+bool IsLayoutOptimized(const FieldDescriptor* field, const Options& options);
+
 // Collects all fields from the given descriptor, excluding weak fields and
 // fields in oneofs.
 //
@@ -744,7 +774,7 @@ template <bool do_nested_types, class T>
 void ForEachField(const Descriptor* d, T&& func) {
   if (do_nested_types) {
     for (int i = 0; i < d->nested_type_count(); i++) {
-      ForEachField<true>(d->nested_type(i), std::forward<T&&>(func));
+      ForEachField<true>(d->nested_type(i), std::forward<T>(func));
     }
   }
   for (int i = 0; i < d->extension_count(); i++) {
@@ -758,7 +788,7 @@ void ForEachField(const Descriptor* d, T&& func) {
 template <class T>
 void ForEachField(const FileDescriptor* d, T&& func) {
   for (int i = 0; i < d->message_type_count(); i++) {
-    ForEachField<true>(d->message_type(i), std::forward<T&&>(func));
+    ForEachField<true>(d->message_type(i), std::forward<T>(func));
   }
   for (int i = 0; i < d->extension_count(); i++) {
     func(d->extension(i));
@@ -842,7 +872,18 @@ std::string WeakDescriptorDataSection(absl::string_view prefix,
 inline std::string WeakDefaultInstanceSection(const Descriptor* descriptor,
                                               int index_in_file_messages,
                                               const Options& options) {
-  return WeakDescriptorDataSection("def", descriptor, index_in_file_messages,
+#ifdef PROTOBUF_MESSAGE_GLOBALS
+  std::string prefix = !IsProfileDriven(options)               ? "def"
+                       : IsPresentMessage(descriptor, options) ? "gh"
+                                                               : "gl";
+#else
+  std::string prefix = "def";
+#endif
+  // TODO: b/474609573 - Remove WeakDescriptorDataSection() once
+  // PROTOBUF_MESSAGE_GLOBALS becomes the default. Note that section assignment
+  // is nuanced to maximize the spatial locality and to support weak descriptor
+  // GC. The status quo is vulnerable to suboptimal prefix.
+  return WeakDescriptorDataSection(prefix, descriptor, index_in_file_messages,
                                    options);
 }
 
@@ -851,8 +892,7 @@ bool UsingImplicitWeakFields(const FileDescriptor* file,
                              const Options& options);
 
 // Indicates whether to treat this field as implicitly weak.
-bool IsImplicitWeakField(const FieldDescriptor* field, const Options& options,
-                         MessageSCCAnalyzer* scc_analyzer);
+bool IsImplicitWeakField(const FieldDescriptor* field, const Options& options);
 
 inline std::string SimpleBaseClass(const Descriptor* desc,
                                    const Options& options) {
@@ -983,8 +1023,7 @@ class PROTOC_EXPORT Formatter {
 
   // Convenience overloads to accept different types as arguments.
   static std::string ToString(absl::string_view s) { return std::string(s); }
-  template <typename I, typename = typename std::enable_if<
-                            std::is_integral<I>::value>::type>
+  template <typename I, typename = std::enable_if_t<std::is_integral_v<I>>>
   static std::string ToString(I x) {
     return absl::StrCat(x);
   }
@@ -1116,11 +1155,6 @@ void GenerateUtf8CheckCodeForString(const FieldDescriptor* field,
                                     absl::string_view parameters,
                                     const Formatter& format);
 
-void GenerateUtf8CheckCodeForCord(const FieldDescriptor* field,
-                                  const Options& options, bool for_parse,
-                                  absl::string_view parameters,
-                                  const Formatter& format);
-
 void GenerateUtf8CheckCodeForString(io::Printer* p,
                                     const FieldDescriptor* field,
                                     const Options& options, bool for_parse,
@@ -1129,6 +1163,8 @@ void GenerateUtf8CheckCodeForString(io::Printer* p,
 void GenerateUtf8CheckCodeForCord(io::Printer* p, const FieldDescriptor* field,
                                   const Options& options, bool for_parse,
                                   absl::string_view parameters);
+
+bool IsStrictUtf8String(const FieldDescriptor* field, const Options& options);
 
 inline bool ShouldGenerateExternSpecializations(const Options& options) {
   // For OSS we omit the specializations to reduce codegen size.
@@ -1211,69 +1247,6 @@ bool HasOnDeserializeTracker(const Descriptor* descriptor,
 // `&ClassName::PostLoopHandler` which should be a static function of the right
 // signature.
 bool NeedsPostLoopHandler(const Descriptor* descriptor, const Options& options);
-
-// Emit the repeated field getter for the custom options.
-// Depending on the bounds check mode specified, this will emit the
-// corresponding getter.
-inline auto GetEmitRepeatedFieldGetterSub(const Options& options,
-                                          io::Printer* p) {
-  return io::Printer::Sub{
-      "getter",
-      [&options, p] {
-        switch (options.bounds_check_mode) {
-          case BoundsCheckMode::kNoEnforcement:
-            p->Emit(R"cc(_internal_$name_internal$().Get(index))cc");
-            break;
-          case BoundsCheckMode::kReturnDefaultValue:
-            p->Emit(R"cc(
-              $pbi$::CheckedGetOrDefault(_internal_$name_internal$(), index)
-            )cc");
-            break;
-          case BoundsCheckMode::kAbort:
-            p->Emit(R"cc(
-              $pbi$::CheckedGetOrAbort(_internal_$name_internal$(), index)
-            )cc");
-            break;
-        }
-      }}
-      .WithSuffix("");
-}
-
-// Emit the code for getting a mutable element from a repeated field. This will
-// generate different code depending on the `bounds_check_mode` specified in the
-// options.
-// TODO: b/347304492 Harden this function by taking in the field and checking
-// if splitting is supported.
-inline auto GetEmitRepeatedFieldMutableSub(const Options& options,
-                                           io::Printer* p,
-                                           bool use_stringpiecefield = false) {
-  return io::Printer::Sub{
-      "mutable",
-      [&options, p, use_stringpiecefield] {
-        switch (options.bounds_check_mode) {
-          case BoundsCheckMode::kNoEnforcement:
-          case BoundsCheckMode::kReturnDefaultValue:
-            if (use_stringpiecefield) {
-              p->Emit("$field$.Mutable(index)");
-            } else {
-              p->Emit(
-                  R"cc(_internal_mutable_$name_internal$()->Mutable(index))cc");
-            }
-            break;
-          case BoundsCheckMode::kAbort:
-            if (use_stringpiecefield) {
-              p->Emit("$pbi$::CheckedMutableOrAbort(&$field$, index)");
-            } else {
-              p->Emit(R"cc(
-                $pbi$::CheckedMutableOrAbort(
-                    _internal_mutable_$name_internal$(), index)
-              )cc");
-            }
-            break;
-        }
-      }}
-      .WithSuffix("");
-}
 
 // Priority used for static initializers.
 enum InitPriority {

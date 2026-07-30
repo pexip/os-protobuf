@@ -60,6 +60,7 @@ std::string RsTypePath(Context& ctx, const EnumDescriptor& descriptor);
 std::string RsViewType(Context& ctx, const FieldDescriptor& field,
                        absl::string_view lifetime);
 
+std::string MessageRsName(const Descriptor& desc);
 std::string EnumRsName(const EnumDescriptor& desc);
 std::string EnumValueRsName(const EnumValueDescriptor& value);
 
@@ -124,6 +125,10 @@ std::string SnakeToUpperCamelCase(absl::string_view input);
 // Converts a SCREAMING_SNAKE_CASE string to an UpperCamelCase string.
 std::string ScreamingSnakeToUpperCamelCase(absl::string_view input);
 
+// Converts a Descriptor's expected C++ fully qualified name to the symbol
+// literal that Crubit expects to be used in the generated bindings.
+std::string CrubitCcSymbolName(const Descriptor& msg);
+
 // Given a fixed prefix, this will repeatedly strip provided
 // string_views if they start with the prefix, the prefix in UpperCamel, or
 // the prefix in snake_case.
@@ -143,6 +148,9 @@ class MultiCasePrefixStripper final {
 // More efficient overload if a stripper is already constructed.
 std::string EnumValueRsName(const MultiCasePrefixStripper& stripper,
                             absl::string_view value_name);
+
+// Returns the name of the generated DescriptorInfo object for the given file.
+std::string DescriptorInfoName(const FileDescriptor& file);
 
 // Describes the names and conversions for a supported map key type.
 struct MapKeyType {

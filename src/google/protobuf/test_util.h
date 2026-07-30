@@ -16,6 +16,7 @@
 #include "absl/strings/string_view.h"
 #include "google/protobuf/unittest.pb.h"
 #include "google/protobuf/unittest_import.pb.h"
+#include "google/protobuf/unittest_mset.pb.h"
 
 // Must be included last.
 #include "google/protobuf/port_def.inc"
@@ -1138,8 +1139,7 @@ inline void TestUtil::ReflectionTester::RemoveLastRepeatedsViaReflection(
 
   std::vector<const FieldDescriptor*> output;
   reflection->ListFields(*message, &output);
-  for (int i = 0; i < output.size(); ++i) {
-    const FieldDescriptor* field = output[i];
+  for (const FieldDescriptor* field : output) {
     if (!field->is_repeated()) continue;
 
     reflection->RemoveLast(message, field);
@@ -1152,8 +1152,7 @@ inline void TestUtil::ReflectionTester::ReleaseLastRepeatedsViaReflection(
 
   std::vector<const FieldDescriptor*> output;
   reflection->ListFields(*message, &output);
-  for (int i = 0; i < output.size(); ++i) {
-    const FieldDescriptor* field = output[i];
+  for (const FieldDescriptor* field : output) {
     if (!field->is_repeated()) continue;
     if (field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE) continue;
 
@@ -1172,8 +1171,7 @@ inline void TestUtil::ReflectionTester::SwapRepeatedsViaReflection(
 
   std::vector<const FieldDescriptor*> output;
   reflection->ListFields(*message, &output);
-  for (int i = 0; i < output.size(); ++i) {
-    const FieldDescriptor* field = output[i];
+  for (const FieldDescriptor* field : output) {
     if (!field->is_repeated()) continue;
 
     reflection->SwapElements(message, field, 0, 1);
@@ -1187,8 +1185,7 @@ inline void TestUtil::ReflectionTester::
   std::vector<const FieldDescriptor*> fields;
   reflection->ListFields(*message, &fields);
 
-  for (int i = 0; i < fields.size(); ++i) {
-    const FieldDescriptor* field = fields[i];
+  for (const FieldDescriptor* field : fields) {
     if (field->is_required() || field->is_repeated() ||
         field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE)
       continue;
@@ -1207,8 +1204,7 @@ inline void TestUtil::ReflectionTester::
   std::vector<const FieldDescriptor*> fields;
   from_reflection->ListFields(*from_message, &fields);
 
-  for (int i = 0; i < fields.size(); ++i) {
-    const FieldDescriptor* field = fields[i];
+  for (const FieldDescriptor* field : fields) {
     if (field->is_required() || field->is_repeated() ||
         field->cpp_type() != FieldDescriptor::CPPTYPE_MESSAGE)
       continue;
@@ -1229,8 +1225,8 @@ inline void TestUtil::ReflectionTester::ExpectMessagesReleasedViaReflection(
       "optional_foreign_message",
       "optional_import_message",
   };
-  for (int i = 0; i < ABSL_ARRAYSIZE(fields); i++) {
-    Message* released = reflection->ReleaseMessage(message, F(fields[i]));
+  for (const char* field : fields) {
+    Message* released = reflection->ReleaseMessage(message, F(field));
     switch (expected_release_state) {
       case IS_NULL:
         EXPECT_TRUE(released == nullptr);
@@ -1242,7 +1238,7 @@ inline void TestUtil::ReflectionTester::ExpectMessagesReleasedViaReflection(
         break;
     }
     delete released;
-    EXPECT_FALSE(reflection->HasField(*message, F(fields[i])));
+    EXPECT_FALSE(reflection->HasField(*message, F(field)));
   }
 }
 
@@ -1255,19 +1251,19 @@ inline void ExpectAllFieldsAndExtensionsInOrder(const std::string& serialized) {
   std::string expected;
   unittest::TestFieldOrderings message;
   message.set_my_int(1);  // Field 1.
-  message.AppendToString(&expected);
+  ABSL_CHECK(message.AppendToString(&expected));
   message.Clear();
   message.SetExtension(unittest::my_extension_int, 23);  // Field 5.
-  message.AppendToString(&expected);
+  ABSL_CHECK(message.AppendToString(&expected));
   message.Clear();
   message.set_my_string("foo");  // Field 11.
-  message.AppendToString(&expected);
+  ABSL_CHECK(message.AppendToString(&expected));
   message.Clear();
   message.SetExtension(unittest::my_extension_string, "bar");  // Field 50.
-  message.AppendToString(&expected);
+  ABSL_CHECK(message.AppendToString(&expected));
   message.Clear();
   message.set_my_float(1.0);  // Field 101.
-  message.AppendToString(&expected);
+  ABSL_CHECK(message.AppendToString(&expected));
   message.Clear();
 
   // We don't EXPECT_EQ() since we don't want to print raw bytes to stdout.
@@ -1397,28 +1393,63 @@ struct TestUtilTraits;
 // It connects all namespace scoped names together.
 // This is needed so that functions that take some type X can find
 // declarations from the same namespace.
-#define PROTOBUF_TEST_UTIL_DECLARE_INPUT(ns, import_ns)                 \
-  template <>                                                           \
-  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {    \
-    PROTOBUF_TEST_UTIL_DECLARE_INPUT_EXTS_(                             \
-        ::ns, PROTOBUF_TEST_UTIL_DECLARE_INPUT_EXT_VARIABLE_);          \
-    using TestAllTypes = ::ns::TestAllTypes;                            \
-    static constexpr auto FOREIGN_FOO = ::ns::FOREIGN_FOO;              \
-    static constexpr auto FOREIGN_BAR = ::ns::FOREIGN_BAR;              \
-    static constexpr auto FOREIGN_BAZ = ::ns::FOREIGN_BAZ;              \
-    static constexpr auto IMPORT_FOO = ::import_ns::IMPORT_FOO;         \
-    static constexpr auto IMPORT_BAR = ::import_ns::IMPORT_BAR;         \
-    static constexpr auto IMPORT_BAZ = ::import_ns::IMPORT_BAZ;         \
-  };                                                                    \
-  template <>                                                           \
-  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestFieldOrderings>     \
-      : google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {};   \
-  template <>                                                           \
-  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestPackedExtensions>   \
-      : google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {};   \
-  template <>                                                           \
-  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestUnpackedExtensions> \
+#define PROTOBUF_TEST_UTIL_DECLARE_INPUT_IMPL(ns, import_ns)                   \
+  template <>                                                                  \
+  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {           \
+    PROTOBUF_TEST_UTIL_DECLARE_INPUT_EXTS_(                                    \
+        ::ns, PROTOBUF_TEST_UTIL_DECLARE_INPUT_EXT_VARIABLE_);                 \
+    using TestAllTypes = ::ns::TestAllTypes;                                   \
+    using TestRequired = ::ns::TestRequired;                                   \
+    using NestedTestMessageSetContainer = ::ns::NestedTestMessageSetContainer; \
+    using OneBytes = ::ns::OneBytes;                                           \
+    using OneString = ::ns::OneString;                                         \
+    using MoreBytes = ::ns::MoreBytes;                                         \
+    using MoreString = ::ns::MoreString;                                       \
+    using TestEmptyMessage = ::ns::TestEmptyMessage;                           \
+    using TestRepeatedScalarDifferentTagSizes =                                \
+        ::ns::TestRepeatedScalarDifferentTagSizes;                             \
+    using TestRecursiveMessage = ::ns::TestRecursiveMessage;                   \
+    using Int32Message = ::ns::Int32Message;                                   \
+    using Uint32Message = ::ns::Uint32Message;                                 \
+    using Int64Message = ::ns::Int64Message;                                   \
+    using Uint64Message = ::ns::Uint64Message;                                 \
+    using BoolMessage = ::ns::BoolMessage;                                     \
+    using RawMessageSet = ::ns::RawMessageSet;                                 \
+    using TestFieldOrderings = ::ns::TestFieldOrderings;                       \
+    using TestMessageSetExtension1 = ::ns::TestMessageSetExtension1;           \
+    using TestMessageSetExtension2 = ::ns::TestMessageSetExtension2;           \
+    using TestMessageSet =                                                     \
+        decltype(TestMessageSetExtension1::message_set_extension)::Extendee;   \
+    using TestOneofBackwardsCompatible = ::ns::TestOneofBackwardsCompatible;   \
+    using TestOneof = ::ns::TestOneof;                                         \
+    using TestOneof2 = ::ns::TestOneof2;                                       \
+    using TestPackedExtensions = ::ns::TestPackedExtensions;                   \
+    using TestUnpackedTypes = ::ns::TestUnpackedTypes;                         \
+    using TestPackedTypes = ::ns::TestPackedTypes;                             \
+    using TestAllExtensions = ::ns::TestAllExtensions;                         \
+    static constexpr auto FOREIGN_FOO = ::ns::FOREIGN_FOO;                     \
+    static constexpr auto FOREIGN_BAR = ::ns::FOREIGN_BAR;                     \
+    static constexpr auto FOREIGN_BAZ = ::ns::FOREIGN_BAZ;                     \
+    static constexpr auto IMPORT_FOO = ::import_ns::IMPORT_FOO;                \
+    static constexpr auto IMPORT_BAR = ::import_ns::IMPORT_BAR;                \
+    static constexpr auto IMPORT_BAZ = ::import_ns::IMPORT_BAZ;                \
+  };                                                                           \
+  template <>                                                                  \
+  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestFieldOrderings>            \
+      : google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {};          \
+  template <>                                                                  \
+  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllTypes>                  \
+      : google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {};          \
+  template <>                                                                  \
+  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestPackedExtensions>          \
+      : google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {};          \
+  template <>                                                                  \
+  struct google::protobuf::TestUtil::TestUtilTraits<::ns::TestUnpackedExtensions>        \
       : google::protobuf::TestUtil::TestUtilTraits<::ns::TestAllExtensions> {}
+
+#define PROTOBUF_TEST_UTIL_DECLARE_INPUT(ns_suffix)                 \
+  PROTOBUF_TEST_UTIL_DECLARE_INPUT_IMPL(proto2_unittest##ns_suffix, \
+                                        proto2_unittest_import##ns_suffix)
 
 // Set every field in the message to a unique value.
 template <typename TestAllTypes>
@@ -3859,7 +3890,7 @@ void ExpectLastRepeatedExtensionsReleased(const TestAllExtensions& message) {
 }  // namespace google
 
 // Declare the default trait so that most users don't need to do it.
-PROTOBUF_TEST_UTIL_DECLARE_INPUT(proto2_unittest, proto2_unittest_import);
+PROTOBUF_TEST_UTIL_DECLARE_INPUT();
 
 #include "google/protobuf/port_undef.inc"
 

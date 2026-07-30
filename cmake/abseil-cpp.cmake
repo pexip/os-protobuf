@@ -88,10 +88,10 @@ else()
     absl::strings
     absl::synchronization
     absl::time
-    absl::type_traits
     absl::utility
   )
   set(protobuf_ABSL_USED_TEST_TARGETS
     absl::scoped_mock_log
+    absl::status_matchers
   )
 endif ()

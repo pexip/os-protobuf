@@ -48,8 +48,6 @@ void SetEnumVariables(
 
   (*variables)["type"] =
       name_resolver->GetImmutableClassName(descriptor->enum_type());
-  (*variables)["mutable_type"] =
-      name_resolver->GetMutableClassName(descriptor->enum_type());
 
   std::string name = (*variables)["name"];
   (*variables)["name_make_immutable"] = absl::StrCat(name, "_.makeImmutable()");
@@ -64,8 +62,7 @@ void SetEnumVariables(
       static_cast<int32_t>(internal::WireFormat::MakeTag(descriptor)));
   (*variables)["tag_size"] = absl::StrCat(
       internal::WireFormat::TagSize(descriptor->number(), GetType(descriptor)));
-  (*variables)["null_check"] =
-      "if (value == null) { throw new NullPointerException(); }";
+  (*variables)["null_check"] = "java.util.Objects.requireNonNull(value);";
   // TODO: Add @deprecated javadoc when generating javadoc is supported
   // by the proto compiler
   (*variables)["deprecation"] =
@@ -122,7 +119,7 @@ ImmutableEnumFieldGenerator::ImmutableEnumFieldGenerator(
                    &variables_, context);
 }
 
-ImmutableEnumFieldGenerator::~ImmutableEnumFieldGenerator() {}
+ImmutableEnumFieldGenerator::~ImmutableEnumFieldGenerator() = default;
 
 int ImmutableEnumFieldGenerator::GetMessageBitIndex() const {
   return message_bit_index_;
@@ -372,7 +369,7 @@ ImmutableEnumOneofFieldGenerator::ImmutableEnumOneofFieldGenerator(
   SetCommonOneofVariables(descriptor, info, &variables_);
 }
 
-ImmutableEnumOneofFieldGenerator::~ImmutableEnumOneofFieldGenerator() {}
+ImmutableEnumOneofFieldGenerator::~ImmutableEnumOneofFieldGenerator() = default;
 
 void ImmutableEnumOneofFieldGenerator::GenerateMembers(
     io::Printer* printer) const {
@@ -594,7 +591,8 @@ RepeatedImmutableEnumFieldGenerator::RepeatedImmutableEnumFieldGenerator(
     : ImmutableEnumFieldGenerator(descriptor, message_bit_index,
                                   builder_bit_index, context) {}
 
-RepeatedImmutableEnumFieldGenerator::~RepeatedImmutableEnumFieldGenerator() {}
+RepeatedImmutableEnumFieldGenerator::~RepeatedImmutableEnumFieldGenerator() =
+    default;
 
 int RepeatedImmutableEnumFieldGenerator::GetNumBitsForMessage() const {
   return 0;

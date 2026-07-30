@@ -29,7 +29,7 @@ class CodedInputStream
     const DEFAULT_RECURSION_LIMIT = 100;
     const DEFAULT_TOTAL_BYTES_LIMIT = 33554432; // 32 << 20, 32MB
 
-    public function __construct($buffer)
+    public function __construct($buffer, $recursion_limit = self::DEFAULT_RECURSION_LIMIT)
     {
         $start = 0;
         $end = strlen($buffer);
@@ -39,8 +39,8 @@ class CodedInputStream
         $this->current = $start;
         $this->current_limit = $end;
         $this->legitimate_message_end = false;
-        $this->recursion_budget = self::DEFAULT_RECURSION_LIMIT;
-        $this->recursion_limit = self::DEFAULT_RECURSION_LIMIT;
+        $this->recursion_budget = $recursion_limit;
+        $this->recursion_limit = $recursion_limit;
         $this->total_bytes_limit = self::DEFAULT_TOTAL_BYTES_LIMIT;
         $this->total_bytes_read = $end - $start;
     }
@@ -271,7 +271,8 @@ class CodedInputStream
     public function readRaw($size, &$buffer)
     {
         $current_buffer_size = 0;
-        if ($this->bufferSize() < $size) {
+        // size (varint) read from the wire could be negative.
+        if ($size < 0 || $this->bufferSize() < $size) {
             return false;
         }
 
@@ -337,7 +338,7 @@ class CodedInputStream
         $byte_limit, &$old_limit, &$recursion_budget)
     {
         $old_limit = $this->pushLimit($byte_limit);
-        $recursion_limit = --$this->recursion_limit;
+        $recursion_budget = --$this->recursion_budget;
     }
 
     public function decrementRecursionDepthAndPopLimit($byte_limit)

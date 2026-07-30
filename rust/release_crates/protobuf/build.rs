@@ -5,13 +5,10 @@
 // license that can be found in the LICENSE file or at
 // https://developers.google.com/open-source/licenses/bsd
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 fn main() {
     cc::Build::new()
         .flag("-std=c99")
-        // TODO: Come up with a way to enable lto
-        // .flag("-flto=thin")
+        .flag_if_supported("-flto=thin")
         .warnings(false)
         .include("libupb")
         .include("libupb/third_party/utf8_range")
@@ -19,9 +16,4 @@ fn main() {
         .file("libupb/third_party/utf8_range/utf8_range.c")
         .define("UPB_BUILD_API", Some("1"))
         .compile("libupb");
-
-    let path = std::path::absolute("libupb").expect("Failed to get full path to libupb");
-
-    println!("cargo:include={}", path.display());
-    println!("cargo:version={}", VERSION);
 }

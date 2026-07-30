@@ -1,0 +1,21 @@
+Description: hppa is over aligned and fails
+ Filter out hppa machines on the static_assert lines.
+Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
+Forwarded: no
+Last-Update: 2026-07-12
+
+---
+
+--- a/src/google/protobuf/descriptor.cc
++++ b/src/google/protobuf/descriptor.cc
+@@ -428,8 +428,10 @@ class FlatAllocatorImpl {
+     ABSL_CHECK(!has_allocated());
+     ABSL_DCHECK_GE(array_size, 0);
+     if (std::is_trivially_destructible<U>::value) {
++#if !defined(__hppa__)
+       // Trivial types are aligned to 8 bytes.
+       static_assert(alignof(U) <= 8, "");
++#endif
+       int64_t bytes =
+           RoundUpTo<8>(static_cast<int64_t>(array_size) * sizeof(U));
+       int& total_char = total_.template Get<char>();

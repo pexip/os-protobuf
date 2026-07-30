@@ -14,35 +14,37 @@ import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 
-class IterableByteBufferInputStream extends InputStream {
+final class IterableByteBufferInputStream extends InputStream {
   /** The {@link Iterator} with type {@link ByteBuffer} of {@code input} */
   private Iterator<ByteBuffer> iterator;
+
   /** The current ByteBuffer; */
   private ByteBuffer currentByteBuffer;
+
   /** The number of ByteBuffers in the input data. */
   private int dataSize;
+
   /**
    * Current {@code ByteBuffer}'s index
    *
    * <p>If index equals dataSize, then all the data in the InputStream has been consumed
    */
   private int currentIndex;
+
   /** The current position for current ByteBuffer */
   private int currentByteBufferPos;
+
   /** Whether current ByteBuffer has an array */
   private boolean hasArray;
+
   /**
    * If the current ByteBuffer is unsafe-direct based, currentArray is null; otherwise should be the
    * array inside ByteBuffer.
    */
   private byte[] currentArray;
+
   /** Current ByteBuffer's array offset */
   private int currentArrayOffset;
-  /**
-   * If the current ByteBuffer is unsafe-direct based, currentAddress is the start address of this
-   * ByteBuffer; otherwise should be zero.
-   */
-  private long currentAddress;
 
   IterableByteBufferInputStream(Iterable<ByteBuffer> data) {
     iterator = data.iterator();
@@ -54,9 +56,7 @@ class IterableByteBufferInputStream extends InputStream {
 
     if (!getNextByteBuffer()) {
       currentByteBuffer = EMPTY_BYTE_BUFFER;
-      currentIndex = 0;
       currentByteBufferPos = 0;
-      currentAddress = 0;
     }
   }
 
@@ -77,7 +77,6 @@ class IterableByteBufferInputStream extends InputStream {
       currentArrayOffset = currentByteBuffer.arrayOffset();
     } else {
       hasArray = false;
-      currentAddress = UnsafeUtil.addressOffset(currentByteBuffer);
       currentArray = null;
     }
     return true;
@@ -100,7 +99,7 @@ class IterableByteBufferInputStream extends InputStream {
       updateCurrentByteBufferPos(1);
       return result;
     } else {
-      int result = UnsafeUtil.getByte(currentByteBufferPos + currentAddress) & 0xFF;
+      int result = currentByteBuffer.get(currentByteBufferPos) & 0xFF;
       updateCurrentByteBufferPos(1);
       return result;
     }

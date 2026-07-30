@@ -97,9 +97,11 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      */
     protected $deprecated = null;
     /**
+     * DEPRECATED. DO NOT USE!
      * For Google-internal migration only. Do not use.
      *
-     * Generated from protobuf field <code>optional bool weak = 10 [default = false];</code>
+     * Generated from protobuf field <code>optional bool weak = 10 [default = false, deprecated = true];</code>
+     * @deprecated
      */
     protected $weak = null;
     /**
@@ -204,6 +206,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      *           for accessors, or it will be completely ignored; in the very least, this
      *           is a formalization for deprecating fields.
      *     @type bool $weak
+     *           DEPRECATED. DO NOT USE!
      *           For Google-internal migration only. Do not use.
      *     @type bool $debug_redact
      *           Indicate that the field value should not be printed out when using debug
@@ -221,7 +224,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      *           The parser stores options it doesn't recognize here. See above.
      * }
      */
-    public function __construct($data = NULL) {
+    public function __construct($data = null)
+    {
         \GPBMetadata\Google\Protobuf\Internal\Descriptor::initOnce();
         parent::__construct($data);
     }
@@ -236,7 +240,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * TODO: make ctype actually deprecated.
      *
      * Generated from protobuf field <code>optional .google.protobuf.FieldOptions.CType ctype = 1 [default = STRING];</code>
-     * @return int
+     * @return int one of the values in {@see \Google\Protobuf\Internal\FieldOptions\CType}
      */
     public function getCtype()
     {
@@ -263,10 +267,10 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * TODO: make ctype actually deprecated.
      *
      * Generated from protobuf field <code>optional .google.protobuf.FieldOptions.CType ctype = 1 [default = STRING];</code>
-     * @param int $var
+     * @param int $var one of the values in {@see \Google\Protobuf\Internal\FieldOptions\CType}
      * @return $this
      */
-    public function setCtype($var)
+    public function setCtype(int $var)
     {
         GPBUtil::checkEnum($var, \Google\Protobuf\Internal\FieldOptions\CType::class);
         $this->ctype = $var;
@@ -314,9 +318,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param bool $var
      * @return $this
      */
-    public function setPacked($var)
+    public function setPacked(bool $var)
     {
-        GPBUtil::checkBool($var);
         $this->packed = $var;
 
         return $this;
@@ -335,7 +338,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * goog.math.Integer.
      *
      * Generated from protobuf field <code>optional .google.protobuf.FieldOptions.JSType jstype = 6 [default = JS_NORMAL];</code>
-     * @return int
+     * @return int one of the values in {@see \Google\Protobuf\Internal\FieldOptions\JSType}
      */
     public function getJstype()
     {
@@ -365,10 +368,10 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * goog.math.Integer.
      *
      * Generated from protobuf field <code>optional .google.protobuf.FieldOptions.JSType jstype = 6 [default = JS_NORMAL];</code>
-     * @param int $var
+     * @param int $var one of the values in {@see \Google\Protobuf\Internal\FieldOptions\JSType}
      * @return $this
      */
-    public function setJstype($var)
+    public function setJstype(int $var)
     {
         GPBUtil::checkEnum($var, \Google\Protobuf\Internal\FieldOptions\JSType::class);
         $this->jstype = $var;
@@ -440,9 +443,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param bool $var
      * @return $this
      */
-    public function setLazy($var)
+    public function setLazy(bool $var)
     {
-        GPBUtil::checkBool($var);
         $this->lazy = $var;
 
         return $this;
@@ -480,9 +482,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param bool $var
      * @return $this
      */
-    public function setUnverifiedLazy($var)
+    public function setUnverifiedLazy(bool $var)
     {
-        GPBUtil::checkBool($var);
         $this->unverified_lazy = $var;
 
         return $this;
@@ -522,45 +523,55 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param bool $var
      * @return $this
      */
-    public function setDeprecated($var)
+    public function setDeprecated(bool $var)
     {
-        GPBUtil::checkBool($var);
         $this->deprecated = $var;
 
         return $this;
     }
 
     /**
+     * DEPRECATED. DO NOT USE!
      * For Google-internal migration only. Do not use.
      *
-     * Generated from protobuf field <code>optional bool weak = 10 [default = false];</code>
+     * Generated from protobuf field <code>optional bool weak = 10 [default = false, deprecated = true];</code>
      * @return bool
+     * @deprecated
      */
     public function getWeak()
     {
+        if (isset($this->weak)) {
+            @trigger_error('weak is deprecated.', E_USER_DEPRECATED);
+        }
         return isset($this->weak) ? $this->weak : false;
     }
 
     public function hasWeak()
     {
+        if (isset($this->weak)) {
+            @trigger_error('weak is deprecated.', E_USER_DEPRECATED);
+        }
         return isset($this->weak);
     }
 
     public function clearWeak()
     {
+        @trigger_error('weak is deprecated.', E_USER_DEPRECATED);
         unset($this->weak);
     }
 
     /**
+     * DEPRECATED. DO NOT USE!
      * For Google-internal migration only. Do not use.
      *
-     * Generated from protobuf field <code>optional bool weak = 10 [default = false];</code>
+     * Generated from protobuf field <code>optional bool weak = 10 [default = false, deprecated = true];</code>
      * @param bool $var
      * @return $this
+     * @deprecated
      */
-    public function setWeak($var)
+    public function setWeak(bool $var)
     {
-        GPBUtil::checkBool($var);
+        @trigger_error('weak is deprecated.', E_USER_DEPRECATED);
         $this->weak = $var;
 
         return $this;
@@ -596,9 +607,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param bool $var
      * @return $this
      */
-    public function setDebugRedact($var)
+    public function setDebugRedact(bool $var)
     {
-        GPBUtil::checkBool($var);
         $this->debug_redact = $var;
 
         return $this;
@@ -606,7 +616,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
 
     /**
      * Generated from protobuf field <code>optional .google.protobuf.FieldOptions.OptionRetention retention = 17;</code>
-     * @return int
+     * @return int one of the values in {@see \Google\Protobuf\Internal\FieldOptions\OptionRetention}
      */
     public function getRetention()
     {
@@ -625,10 +635,10 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
 
     /**
      * Generated from protobuf field <code>optional .google.protobuf.FieldOptions.OptionRetention retention = 17;</code>
-     * @param int $var
+     * @param int $var one of the values in {@see \Google\Protobuf\Internal\FieldOptions\OptionRetention}
      * @return $this
      */
-    public function setRetention($var)
+    public function setRetention(int $var)
     {
         GPBUtil::checkEnum($var, \Google\Protobuf\Internal\FieldOptions\OptionRetention::class);
         $this->retention = $var;
@@ -638,7 +648,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
 
     /**
      * Generated from protobuf field <code>repeated .google.protobuf.FieldOptions.OptionTargetType targets = 19;</code>
-     * @return RepeatedField<int>
+     * @return RepeatedField<int> one of the values in {@see \Google\Protobuf\Internal\FieldOptions\OptionTargetType}
      */
     public function getTargets()
     {
@@ -647,10 +657,10 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
 
     /**
      * Generated from protobuf field <code>repeated .google.protobuf.FieldOptions.OptionTargetType targets = 19;</code>
-     * @param int[] $var
+     * @param int[] $var one of the values in {@see \Google\Protobuf\Internal\FieldOptions\OptionTargetType}
      * @return $this
      */
-    public function setTargets($var)
+    public function setTargets(array|RepeatedField $var)
     {
         $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::ENUM, \Google\Protobuf\Internal\FieldOptions\OptionTargetType::class);
         $this->targets = $arr;
@@ -672,7 +682,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param \Google\Protobuf\Internal\FieldOptions\EditionDefault[] $var
      * @return $this
      */
-    public function setEditionDefaults($var)
+    public function setEditionDefaults(array|RepeatedField $var)
     {
         $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \Google\Protobuf\Internal\FieldOptions\EditionDefault::class);
         $this->edition_defaults = $arr;
@@ -714,9 +724,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param \Google\Protobuf\Internal\FeatureSet $var
      * @return $this
      */
-    public function setFeatures($var)
+    public function setFeatures(\Google\Protobuf\Internal\FeatureSet|null $var)
     {
-        GPBUtil::checkMessage($var, \Google\Protobuf\Internal\FeatureSet::class);
         $this->features = $var;
 
         return $this;
@@ -746,9 +755,8 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param \Google\Protobuf\Internal\FieldOptions\FeatureSupport $var
      * @return $this
      */
-    public function setFeatureSupport($var)
+    public function setFeatureSupport(\Google\Protobuf\Internal\FieldOptions\FeatureSupport|null $var)
     {
-        GPBUtil::checkMessage($var, \Google\Protobuf\Internal\FieldOptions\FeatureSupport::class);
         $this->feature_support = $var;
 
         return $this;
@@ -772,7 +780,7 @@ class FieldOptions extends \Google\Protobuf\Internal\Message
      * @param \Google\Protobuf\Internal\UninterpretedOption[] $var
      * @return $this
      */
-    public function setUninterpretedOption($var)
+    public function setUninterpretedOption(array|RepeatedField $var)
     {
         $arr = GPBUtil::checkRepeatedField($var, \Google\Protobuf\Internal\GPBType::MESSAGE, \Google\Protobuf\Internal\UninterpretedOption::class);
         $this->uninterpreted_option = $arr;

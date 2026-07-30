@@ -1,3 +1,0 @@
-usr/lib/${DEB_HOST_MULTIARCH}/libprotobuf.so.*
-usr/lib/${DEB_HOST_MULTIARCH}/libutf8_range.so.*
-usr/lib/${DEB_HOST_MULTIARCH}/libutf8_validity.so.*

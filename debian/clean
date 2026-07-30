@@ -1,3 +1,5 @@
 protoc.1
+java/core/src/main/java/com/google/protobuf/JavaFeaturesProto.java
+php/ext/google/protobuf/wkt.inc
 ruby/ext/google/protobuf_c/third_party/wyhash/wyhash.h
 ruby/tests/multi_level_nesting_test_pb.rb

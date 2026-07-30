@@ -1,0 +1,105 @@
+Description: Remove dependency on javax.annotation library
+ It's not yet packaged and not mandatory.
+Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
+Forwarded: not-needed
+Last-Update: 2026-07-12
+
+---
+
+--- a/java/util/src/main/java/com/google/protobuf/util/FieldMaskUtil.java
++++ b/java/util/src/main/java/com/google/protobuf/util/FieldMaskUtil.java
+@@ -18,7 +18,7 @@ import java.util.Arrays;
+ import java.util.List;
+ import java.util.Optional;
+ import java.util.stream.Collectors;
+-import javax.annotation.Nullable;
++//import javax.annotation.Nullable;
+ 
+ /** Utility helper functions to work with {@link com.google.protobuf.FieldMask}. */
+ public final class FieldMaskUtil {
+@@ -221,7 +221,7 @@ public final class FieldMaskUtil {
+   }
+ 
+   /** Checks whether paths in a given fields mask are valid. */
+-  public static boolean isValid(@Nullable Descriptor descriptor, String path) {
++  public static boolean isValid(Descriptor descriptor, String path) {
+     String[] parts = path.split(FIELD_SEPARATOR_REGEX);
+     if (parts.length == 0) {
+       return false;
+--- a/java/util/src/main/java/com/google/protobuf/util/JsonFormat.java
++++ b/java/util/src/main/java/com/google/protobuf/util/JsonFormat.java
+@@ -65,7 +65,7 @@ import java.util.Map;
+ import java.util.Set;
+ import java.util.TreeMap;
+ import java.util.logging.Logger;
+-import javax.annotation.Nullable;
++//import javax.annotation.Nullable;
+ 
+ /**
+  * Utility class to convert protobuf messages to/from the <a href=
+@@ -664,12 +664,10 @@ public class JsonFormat {
+      * Find a type by its full name. Returns null if it cannot be found in this {@link
+      * TypeRegistry}.
+      */
+-    @Nullable
+     public Descriptor find(String name) {
+       return types.get(name);
+     }
+ 
+-    @Nullable
+     Descriptor getDescriptorForTypeUrl(String typeUrl) throws InvalidProtocolBufferException {
+       return find(getTypeName(typeUrl));
+     }
+@@ -1296,7 +1294,7 @@ public class JsonFormat {
+     }
+ 
+     /** Prints a regular message with an optional type URL. */
+-    private void print(MessageOrBuilder message, @Nullable String typeUrl) throws IOException {
++    private void print(MessageOrBuilder message, String typeUrl) throws IOException {
+       generator.println("{");
+       generator.indent();
+ 
+@@ -2423,7 +2421,6 @@ public class JsonFormat {
+       }
+     }
+ 
+-    @Nullable
+     private EnumValueDescriptor parseEnum(EnumDescriptor enumDescriptor, JsonElement json)
+         throws InvalidProtocolBufferException {
+       String value = json.getAsString();
+@@ -2454,7 +2451,6 @@ public class JsonFormat {
+     }
+ 
+     @SuppressWarnings("AvoidValueSetter")
+-    @Nullable
+     private Object parseFieldValue(FieldDescriptor field, JsonElement json, Message.Builder builder)
+         throws InvalidProtocolBufferException {
+       if (json instanceof JsonNull) {
+--- a/java/util/src/main/java/com/google/protobuf/util/Timestamps.java
++++ b/java/util/src/main/java/com/google/protobuf/util/Timestamps.java
+@@ -25,7 +25,7 @@ import java.util.GregorianCalendar;
+ import java.util.Locale;
+ import java.util.TimeZone;
+ import java.util.logging.Logger;
+-import javax.annotation.Nullable;
++//import javax.annotation.Nullable;
+ 
+ /**
+  * Utilities to help create/manipulate {@code protobuf/timestamp.proto}. All operations throw an
+@@ -313,16 +313,12 @@ public final class Timestamps {
+ 
+   // the following 3 constants contain references to java.time.Instant methods (if that class is
+   // available at runtime); otherwise, they are null.
+-  @Nullable
+   private static final Method INSTANT_NOW = instantMethod("now");
+ 
+-  @Nullable
+   private static final Method INSTANT_GET_EPOCH_SECOND = instantMethod("getEpochSecond");
+ 
+-  @Nullable
+   private static final Method INSTANT_GET_NANO = instantMethod("getNano");
+ 
+-  @Nullable
+   private static Method instantMethod(String methodName) {
+     try {
+       return Class.forName("java.time.Instant").getMethod(methodName);

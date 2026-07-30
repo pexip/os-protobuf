@@ -13,13 +13,16 @@
 #include <cstdint>
 #include <limits>
 #include <memory>
-#include <random>
 #include <utility>
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "absl/base/optimization.h"
 #include "absl/log/absl_check.h"
+#include "absl/log/log_streamer.h"
+#include "absl/random/random.h"
+#include "absl/random/seed_sequences.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
@@ -47,7 +50,7 @@ class ThreadSafeArenaStatsHandlePeer {
 
 std::vector<size_t> GetBytesAllocated(ThreadSafeArenazSampler* s) {
   std::vector<size_t> res;
-  s->Iterate([&](const ThreadSafeArenaStats& info) {
+  EXPECT_EQ(s->Iterate([&](const ThreadSafeArenaStats& info) {
     for (const auto& block_stats : info.block_histogram) {
       size_t bytes_allocated =
           block_stats.bytes_allocated.load(std::memory_order_acquire);
@@ -55,7 +58,8 @@ std::vector<size_t> GetBytesAllocated(ThreadSafeArenazSampler* s) {
         res.push_back(bytes_allocated);
       }
     }
-  });
+  }),
+            0);
   return res;
 }
 
@@ -77,7 +81,7 @@ namespace {
 TEST(ThreadSafeArenaStatsTest, PrepareForSampling) {
   ThreadSafeArenaStats info;
   constexpr int64_t kTestStride = 107;
-  absl::MutexLock l(&info.init_mu);
+  absl::MutexLock l(info.init_mu);
   info.PrepareForSampling(kTestStride);
 
   for (const auto& block_stats : info.block_histogram) {
@@ -125,6 +129,8 @@ TEST(ThreadSafeArenaStatsTest, FindBin) {
 }
 
 TEST(ThreadSafeArenaStatsTest, MinMaxBlockSizeForBin) {
+  std::pair<size_t, size_t> prev_limits =
+      ThreadSafeArenaStats::MinMaxBlockSizeForBin(0);
   std::pair<size_t, size_t> current_limits =
       ThreadSafeArenaStats::MinMaxBlockSizeForBin(0);
   EXPECT_EQ(current_limits.first, 1);
@@ -138,16 +144,21 @@ TEST(ThreadSafeArenaStatsTest, MinMaxBlockSizeForBin) {
     if (i != ThreadSafeArenaStats::kBlockHistogramBins - 1) {
       EXPECT_EQ(next_limits.second, 2 * current_limits.second);
     }
+    prev_limits = current_limits;
     current_limits = next_limits;
   }
   // Test the limits cover the entire range possible.
+  EXPECT_EQ(prev_limits.second, 2 << 20);
+  EXPECT_EQ(current_limits.first,
+            ThreadSafeArenaStats::kMaxSizeForPenultimateBin + 1);
+  EXPECT_EQ(current_limits.first, (2 << 20) + 1);
   EXPECT_EQ(current_limits.second, std::numeric_limits<size_t>::max());
 }
 
 TEST(ThreadSafeArenaStatsTest, RecordAllocateSlow) {
   ThreadSafeArenaStats info;
   constexpr int64_t kTestStride = 458;
-  absl::MutexLock l(&info.init_mu);
+  absl::MutexLock l(info.init_mu);
   info.PrepareForSampling(kTestStride);
   RecordAllocateSlow(&info, /*requested=*/0, /*allocated=*/128, /*wasted=*/0);
   EXPECT_EQ(
@@ -179,7 +190,7 @@ TEST(ThreadSafeArenaStatsTest, RecordAllocateSlow) {
 TEST(ThreadSafeArenaStatsTest, RecordAllocateSlowMaxBlockSizeTest) {
   ThreadSafeArenaStats info;
   constexpr int64_t kTestStride = 458;
-  absl::MutexLock l(&info.init_mu);
+  absl::MutexLock l(info.init_mu);
   info.PrepareForSampling(kTestStride);
   RecordAllocateSlow(&info, /*requested=*/100, /*allocated=*/128, /*wasted=*/0);
   EXPECT_EQ(info.max_block_size.load(std::memory_order_relaxed), 128);
@@ -265,7 +276,7 @@ TEST(ThreadSafeArenazSamplerTest, Handle) {
                                                  std::memory_order_relaxed);
 
   bool found = false;
-  sampler.Iterate([&](const ThreadSafeArenaStats& h) {
+  EXPECT_EQ(sampler.Iterate([&](const ThreadSafeArenaStats& h) {
     if (&h == info) {
       EXPECT_EQ(
           h.block_histogram[0].bytes_allocated.load(std::memory_order_relaxed),
@@ -273,12 +284,13 @@ TEST(ThreadSafeArenazSamplerTest, Handle) {
       EXPECT_EQ(h.weight, kTestStride);
       found = true;
     }
-  });
+  }),
+            0);
   EXPECT_TRUE(found);
 
   h = ThreadSafeArenaStatsHandle();
   found = false;
-  sampler.Iterate([&](const ThreadSafeArenaStats& h) {
+  EXPECT_EQ(sampler.Iterate([&](const ThreadSafeArenaStats& h) {
     if (&h == info) {
       // this will only happen if some other thread has resurrected the info
       // the old handle was using.
@@ -287,7 +299,8 @@ TEST(ThreadSafeArenazSamplerTest, Handle) {
         found = true;
       }
     }
-  });
+  }),
+            0);
   EXPECT_FALSE(found);
 }
 
@@ -330,6 +343,14 @@ TEST(ThreadSafeArenazSamplerTest, Unregistration) {
   EXPECT_THAT(GetBytesAllocated(&sampler), IsEmpty());
 }
 
+// This will log the following:
+// ```
+// Tagged seed sequence (ABSL_RANDOM_SALT_OVERRIDE=fBAY_g): SEED_MT_0=XVKmv...
+// Tagged seed sequence (ABSL_RANDOM_SALT_OVERRIDE=fBAY_g): SEED_MT_1=5wvqx...
+//   ...
+// ```
+// To try to reproduce a run using the same random sequence, do this:
+//   $ export SEED_MT_0=XVKmv... SEED_MT_1=5wvqx... ... bazel test <this test>
 TEST(ThreadSafeArenazSamplerTest, MultiThreaded) {
   ThreadSafeArenazSampler sampler;
   absl::Notification stop;
@@ -337,23 +358,22 @@ TEST(ThreadSafeArenazSamplerTest, MultiThreaded) {
 
   for (int i = 0; i < 10; ++i) {
     const int64_t sampling_stride = 11 + i % 3;
-    pool.Schedule([&sampler, &stop, sampling_stride]() {
-      std::random_device rd;
-      std::mt19937 gen(rd());
-
+    pool.Schedule([i, &sampler, &stop, sampling_stride]() {
+      absl::BitGen bitgen{absl::MakeTaggedSeedSeq(
+          /*env_var=*/absl::StrCat("SEED_", test_info_->name(), "_", i).c_str(),
+          /*stream=*/absl::LogInfoStreamer().stream())};
       std::vector<ThreadSafeArenaStats*> infoz;
       while (!stop.HasBeenNotified()) {
         if (infoz.empty()) {
           infoz.push_back(sampler.Register(sampling_stride));
         }
-        switch (std::uniform_int_distribution<>(0, 1)(gen)) {
+        switch (absl::Uniform(absl::IntervalClosedClosed, bitgen, 0, 1)) {
           case 0: {
             infoz.push_back(sampler.Register(sampling_stride));
             break;
           }
           case 1: {
-            size_t p =
-                std::uniform_int_distribution<>(0, infoz.size() - 1)(gen);
+            size_t p = absl::Uniform<size_t>(bitgen, 0, infoz.size());
             ThreadSafeArenaStats* info = infoz[p];
             infoz[p] = infoz.back();
             infoz.pop_back();
@@ -361,6 +381,9 @@ TEST(ThreadSafeArenazSamplerTest, MultiThreaded) {
             sampler.Unregister(info);
             break;
           }
+          default:
+            ABSL_UNREACHABLE();
+            break;
         }
       }
     });
@@ -411,7 +434,7 @@ TEST(ThreadSafeArenazSamplerTest, InitialBlockReportsZeroUsedAndWasted) {
     char block[kSize];
     google::protobuf::Arena arena(/*initial_block=*/block, /*initial_block_size=*/kSize);
     benchmark::DoNotOptimize(&arena);
-    sampler.Iterate([&](const ThreadSafeArenaStats& h) {
+    EXPECT_EQ(sampler.Iterate([&](const ThreadSafeArenaStats& h) {
       const auto& histbin =
           h.block_histogram[ThreadSafeArenaStats::FindBin(kSize)];
       if (histbin.bytes_allocated.load(std::memory_order_relaxed) == kSize) {
@@ -419,7 +442,8 @@ TEST(ThreadSafeArenazSamplerTest, InitialBlockReportsZeroUsedAndWasted) {
         EXPECT_EQ(histbin.bytes_used, 0);
         EXPECT_EQ(histbin.bytes_wasted, 0);
       }
-    });
+    }),
+              0);
   }
   EXPECT_GT(count_found_allocation, 0);
   SetThreadSafeArenazSampleParameter(oldparam);
@@ -478,7 +502,8 @@ TEST(ThreadSafeArenazSamplerTest, MultiThread) {
     if (barrier->Block()) {
       delete barrier;
     }
-    sampler.Iterate([&](const ThreadSafeArenaStats& h) { ++count; });
+    EXPECT_EQ(sampler.Iterate([&](const ThreadSafeArenaStats& h) { ++count; }),
+              0);
     for (int i = 0; i < kNumThreads; i++) {
       threads[i]->Join();
     }
@@ -522,7 +547,8 @@ TEST(ThreadSafeArenazSamplerTest, SampleFirstArena) {
 
   auto count_samples = [&]() {
     int count = 0;
-    sampler.Iterate([&](const ThreadSafeArenaStats& h) { ++count; });
+    EXPECT_EQ(sampler.Iterate([&](const ThreadSafeArenaStats& h) { ++count; }),
+              0);
     return count;
   };
 
@@ -585,9 +611,9 @@ TEST(ThreadSafeArenazSamplerTest, UsedAndWasted) {
   // Do enough small allocations to completely fill 3 first blocks.
   // Test that they are fully used and none wasted.
   for (int i = 0; i < 1000; ++i) {
-    Arena::Create<char>(&arena);
+    (void)Arena::Create<char>(&arena);
   }
-  sampler.Iterate([&](const ThreadSafeArenaStats& h) {
+  EXPECT_EQ(sampler.Iterate([&](const ThreadSafeArenaStats& h) {
     for (size_t i = 0; i < 3; ++i) {
       constexpr auto kSize =
           google::protobuf::internal::AllocationPolicy::kDefaultStartBlockSize;
@@ -598,7 +624,8 @@ TEST(ThreadSafeArenazSamplerTest, UsedAndWasted) {
                 (kSize << i) - google::protobuf::internal::SerialArena::kBlockHeaderSize);
       EXPECT_EQ(histbin.bytes_wasted, 0);
     }
-  });
+  }),
+            0);
   SetThreadSafeArenazSampleParameter(oldparam);
 }
 #endif  // defined(PROTOBUF_ARENAZ_SAMPLE)

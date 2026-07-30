@@ -28,7 +28,6 @@
 #include "absl/functional/any_invocable.h"
 #include "absl/functional/function_ref.h"
 #include "absl/log/absl_check.h"
-#include "absl/meta/type_traits.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -140,7 +139,8 @@ class AnnotationProtoCollector : public AnnotationCollector {
 
   void AddAnnotationNew(Annotation& a) override {
     auto* annotation = annotation_proto_->add_annotation();
-    annotation->ParseFromString(a.second);
+    // TODO: Remove this suppression.
+    (void)annotation->ParseFromString(a.second);
     annotation->set_begin(a.first.first);
     annotation->set_end(a.first.second);
   }
@@ -536,11 +536,11 @@ class PROTOBUF_EXPORT Printer {
   // Returns an RAII object that pops the lookup frame.
   template <
       typename Map = absl::flat_hash_map<absl::string_view, absl::string_view>,
-      typename = std::enable_if_t<!std::is_pointer<Map>::value>,
+      typename = std::enable_if_t<!std::is_pointer_v<Map>>,
       // Prefer the more specific span impl if this could be turned into
       // a span.
-      typename = std::enable_if_t<
-          !std::is_convertible<Map, absl::Span<const Sub>>::value>>
+      typename =
+          std::enable_if_t<!std::is_convertible_v<Map, absl::Span<const Sub>>>>
   auto WithVars(Map&& vars);
 
   // Pushes a new variable lookup frame that stores `vars` by value.
@@ -664,7 +664,7 @@ class PROTOBUF_EXPORT Printer {
   void Indent() { indent_ += options_.spaces_per_indent; }
 
   // Undoes a call to Indent().
-  void Outdent();
+  void Outdent(SourceLocation loc = SourceLocation::current());
 
   // FormatInternal is a helper function not meant to use directly, use
   // compiler::cpp::Formatter instead.
@@ -951,10 +951,9 @@ struct Printer::AnnotationRecord {
   //
   // {{"foo", my_cool_descriptor}, {"bar", "file.proto"}}
 
-  template <
-      typename String,
-      std::enable_if_t<std::is_convertible<const String&, std::string>::value,
-                       int> = 0>
+  template <typename String,
+            std::enable_if_t<std::is_convertible_v<const String&, std::string>,
+                             int> = 0>
   AnnotationRecord(  // NOLINT(google-explicit-constructor)
       const String& file_path,
       absl::optional<AnnotationCollector::Semantic> semantic = absl::nullopt)
@@ -963,7 +962,7 @@ struct Printer::AnnotationRecord {
   template <typename Desc,
             // This SFINAE clause excludes char* from matching this
             // constructor.
-            std::enable_if_t<std::is_class<Desc>::value, int> = 0>
+            std::enable_if_t<std::is_class_v<Desc>, int> = 0>
   AnnotationRecord(  // NOLINT(google-explicit-constructor)
       const Desc* desc,
       absl::optional<AnnotationCollector::Semantic> semantic = absl::nullopt)

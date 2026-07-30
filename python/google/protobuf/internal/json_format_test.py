@@ -14,6 +14,7 @@ import math
 import struct
 import unittest
 
+from absl.testing import parameterized
 from google.protobuf import descriptor_pool
 from google.protobuf import json_format
 from google.protobuf.internal import more_messages_pb2
@@ -29,11 +30,12 @@ from google.protobuf import wrappers_pb2
 from google.protobuf import any_test_pb2
 from google.protobuf import unittest_mset_pb2
 from google.protobuf import unittest_pb2
+from google.protobuf.json import json_enumval_custom_string_pb2
 from google.protobuf.util import json_format_pb2
 from google.protobuf.util import json_format_proto3_pb2
 
 
-class JsonFormatBase(unittest.TestCase):
+class JsonFormatBase(parameterized.TestCase):
 
   def FillAllFields(self, message):
     message.int32_value = 20
@@ -179,6 +181,46 @@ class JsonFormatTest(JsonFormatBase):
     ext1 = unittest_pb2.TestNestedExtension.test
     message.Extensions[ext1] = 'data'
     message_dict = json_format.MessageToDict(message)
+    parsed_message = unittest_pb2.TestAllExtensions()
+    json_format.ParseDict(message_dict, parsed_message)
+    self.assertEqual(message, parsed_message)
+
+  def testScalarExtensionToDictAndBack(self):
+    message = unittest_pb2.TestAllExtensions()
+    message.Extensions[unittest_pb2.optional_int32_extension] = 7
+    message.Extensions[unittest_pb2.optional_string_extension] = 'hello'
+    message_dict = json_format.MessageToDict(message)
+    self.assertEqual(
+        message_dict,
+        {
+            '[proto2_unittest.optional_int32_extension]': 7,
+            '[proto2_unittest.optional_string_extension]': 'hello',
+        },
+    )
+    parsed_message = unittest_pb2.TestAllExtensions()
+    json_format.ParseDict(message_dict, parsed_message)
+    self.assertEqual(message, parsed_message)
+
+  def testRepeatedScalarExtensionToDictAndBack(self):
+    message = unittest_pb2.TestAllExtensions()
+    ext1 = unittest_pb2.repeated_int32_extension
+    message.Extensions[ext1].extend([1, 2, 3])
+    message_dict = json_format.MessageToDict(message)
+    self.assertIn('[proto2_unittest.repeated_int32_extension]', message_dict)
+    parsed_message = unittest_pb2.TestAllExtensions()
+    json_format.ParseDict(message_dict, parsed_message)
+    self.assertEqual(message, parsed_message)
+
+  def testRepeatedMessageExtensionToDictAndBack(self):
+    message = unittest_pb2.TestAllExtensions()
+    ext1 = unittest_pb2.repeated_nested_message_extension
+    sub = unittest_pb2.TestAllTypes.NestedMessage()
+    sub.bb = 1
+    message.Extensions[ext1].append(sub)
+    message_dict = json_format.MessageToDict(message)
+    self.assertIn(
+        '[proto2_unittest.repeated_nested_message_extension]', message_dict
+    )
     parsed_message = unittest_pb2.TestAllExtensions()
     json_format.ParseDict(message_dict, parsed_message)
     self.assertEqual(message, parsed_message)
@@ -965,17 +1007,6 @@ class JsonFormatTest(JsonFormatBase):
 
   def testFloatPrecision(self):
     message = json_format_proto3_pb2.TestMessage()
-    message.float_value = 1.123456789
-    # Set to 8 valid digits.
-    text = '{\n  "floatValue": 1.1234568\n}'
-    self.assertEqual(
-        json_format.MessageToJson(message, float_precision=8), text
-    )
-    # Set to 7 valid digits.
-    text = '{\n  "floatValue": 1.123457\n}'
-    self.assertEqual(
-        json_format.MessageToJson(message, float_precision=7), text
-    )
 
     # Default float_precision will automatic print shortest float.
     message.float_value = 1.1000000011
@@ -1041,7 +1072,10 @@ class JsonFormatTest(JsonFormatBase):
     self.assertRaisesRegex(
         json_format.ParseError,
         'Invalid enum value',
-        json_format.Parse, '{"a": "UNKNOWN_STRING_VALUE"}', message)
+        json_format.Parse,
+        '{"a": "UNKNOWN_STRING_VALUE"}',
+        message,
+    )
 
   def testParseUnknownEnumStringValue_Repeated_Proto2(self):
     message = json_format_pb2.TestRepeatedEnum()
@@ -1066,8 +1100,9 @@ class JsonFormatTest(JsonFormatBase):
     """
     json_format.Parse(text, message, ignore_unknown_fields=True)
 
-    self.assertFalse(json_format_pb2.TestExtension.enum_ext in
-                     message.Extensions)
+    self.assertFalse(
+        json_format_pb2.TestExtension.enum_ext in message.Extensions
+    )
 
   def testParseUnknownEnumStringValue_ExtensionFieldWithoutIgnore_Proto2(self):
     message = json_format_pb2.TestMessageWithExtension()
@@ -1077,7 +1112,10 @@ class JsonFormatTest(JsonFormatBase):
     self.assertRaisesRegex(
         json_format.ParseError,
         'Invalid enum value',
-        json_format.Parse, text, message)
+        json_format.Parse,
+        text,
+        message,
+    )
 
   def testParseUnknownEnumStringValue_Scalar_Proto3(self):
     message = json_format_proto3_pb2.TestMessage()
@@ -1092,8 +1130,9 @@ class JsonFormatTest(JsonFormatBase):
     json_format.Parse(text, message, ignore_unknown_fields=True)
 
     self.assertEqual(len(message.repeated_enum_value), 1)
-    self.assertTrue(message.repeated_enum_value[0] ==
-                    json_format_proto3_pb2.FOO)
+    self.assertTrue(
+        message.repeated_enum_value[0] == json_format_proto3_pb2.FOO
+    )
 
   def testParseUnknownEnumStringValue_Map_Proto3(self):
     message = json_format_proto3_pb2.MapOfEnums()
@@ -1155,6 +1194,28 @@ class JsonFormatTest(JsonFormatBase):
         'Failed to load JSON: duplicate key int32Value.',
     )
 
+  def testDuplicateFieldAlternateNames(self):
+    # Note: this behavior is non-spec and an oversight bug in the
+    # implementation, but would be a breaking change to fix. The duplicate field
+    # checker intends reject inputs with duplicate key names, but it only
+    # catches keys that are exact matches and not alternate spellings that
+    # correspond to the same field.
+    parsed_message = json_format_proto3_pb2.TestMessage()
+    json_format.Parse('{"int32Value": 1,"int32_value":2}', parsed_message)
+    self.assertEqual(parsed_message.int32_value, 2)
+
+  def testDuplicateFieldAlternateNamesMap(self):
+    # Note: this behavior is non-spec and an oversight bug in the
+    # implementation, but would be a breaking change to fix. The duplicate field
+    # checker intends reject inputs with duplicate key names, but it only
+    # catches keys that are exact matches and not alternate spellings that
+    # correspond to the same field.
+    parsed_message = json_format_proto3_pb2.TestMap()
+    json_format.Parse(
+        '{"int32Map": {"1": 2}, "int32_map": {"3": 4}}', parsed_message
+    )
+    self.assertEqual(parsed_message.int32_map, {3: 4})
+
   def testInvalidBoolValue(self):
     self.CheckError(
         '{"boolValue": 1}',
@@ -1183,7 +1244,7 @@ class JsonFormatTest(JsonFormatBase):
     )
     self.CheckError(
         '{"int32Value": "foo"}',
-        'Failed to parse int32Value field: invalid literal for int\(\) with'
+        'Failed to parse int32Value field: invalid literal for int\\(\\) with'
         " base 10: 'foo'.",
     )
     self.CheckError(
@@ -1342,7 +1403,7 @@ class JsonFormatTest(JsonFormatBase):
     text = '{"value": "0000-01-01T00:00:00Z"}'
     self.assertRaisesRegex(
         json_format.ParseError,
-        'Failed to parse value field: year (0 )?is out of range.',
+        'Failed to parse value field: year ',
         json_format.Parse,
         text,
         message,
@@ -1458,7 +1519,13 @@ class JsonFormatTest(JsonFormatBase):
   def testInvalidAny(self):
     message = any_pb2.Any()
     text = '{"@type": "type.googleapis.com/google.protobuf.Int32Value"}'
-    self.assertRaisesRegex(json_format.ParseError, 'KeyError: \'value\'', json_format.Parse, text, message)
+    self.assertRaisesRegex(
+        json_format.ParseError,
+        "KeyError: 'value'",
+        json_format.Parse,
+        text,
+        message,
+    )
     text = '{"value": 1234}'
     self.assertRaisesRegex(
         json_format.ParseError,
@@ -1695,6 +1762,128 @@ class JsonFormatTest(JsonFormatBase):
         '{"payload": {}, "child": {"child":{}}}', message, max_recursion_depth=3
     )
 
+  def testStructRecursionDepthEnforcement(self):
+    """Test that nested Struct messages respect max_recursion_depth limit."""
+    message = struct_pb2.Struct()
+    # With max_recursion_depth=5, we can nest up to depth 5.
+    # {"a": {"b": {"c": {}}}} will reach depth 6 when trying to parse "c" value.
+    # This is treated as 6 in our depth enforcement rather than depth 3 because
+    # it is Struct-Value-Struct-Value-Struct-Value.
+    nested_dict = {'a': {'b': {'c': {}}}}
+    self.assertRaisesRegex(
+        json_format.ParseError,
+        'Message too deep. Max recursion depth is 5',
+        json_format.ParseDict,
+        nested_dict,
+        message,
+        max_recursion_depth=5,
+    )
+
+    # This should pass as it reaches depth 5.
+    shallow_dict = {'a': {'b': {}}}
+    json_format.ParseDict(shallow_dict, message, max_recursion_depth=5)
+
+  def testAnyRecursionDepthEnforcement(self):
+    """Test that nested Any messages respect max_recursion_depth limit."""
+    # Test that deeply nested Any messages raise ParseError instead of
+    # bypassing the recursion limit. This prevents DoS via nested Any.
+    message = any_pb2.Any()
+
+    # Create nested Any structure that should exceed depth limit
+    # With max_recursion_depth=5, we can nest 4 Any messages
+    # (depth 1 = outer Any, depth 2-4 = nested Anys, depth 5 = final value)
+    nested_any = {
+        '@type': 'type.googleapis.com/google.protobuf.Any',
+        'value': {
+            '@type': 'type.googleapis.com/google.protobuf.Any',
+            'value': {
+                '@type': 'type.googleapis.com/google.protobuf.Any',
+                'value': {
+                    '@type': 'type.googleapis.com/google.protobuf.Any',
+                    'value': {
+                        '@type': 'type.googleapis.com/google.protobuf.Any',
+                        'value': {},
+                    },
+                },
+            },
+        },
+    }
+
+    # Should raise ParseError due to exceeding max depth, not RecursionError
+    self.assertRaisesRegex(
+        json_format.ParseError,
+        'Message too deep. Max recursion depth is 5',
+        json_format.ParseDict,
+        nested_any,
+        message,
+        max_recursion_depth=5,
+    )
+
+    # Verify that Any messages within the limit can be parsed successfully
+    # With max_recursion_depth=5, we can nest up to 4 Any messages
+    shallow_any = {
+        '@type': 'type.googleapis.com/google.protobuf.Any',
+        'value': {
+            '@type': 'type.googleapis.com/google.protobuf.Any',
+            'value': {
+                '@type': 'type.googleapis.com/google.protobuf.Any',
+                'value': {
+                    '@type': 'type.googleapis.com/google.protobuf.Any',
+                    'value': {},
+                },
+            },
+        },
+    }
+    json_format.ParseDict(shallow_any, message, max_recursion_depth=5)
+
+  def testAnyRecursionDepthBoundary(self):
+    """Test recursion depth boundary behavior (exclusive upper limit)."""
+    message = any_pb2.Any()
+
+    # Create nested Any at depth exactly 4 (should succeed with max_recursion_depth=5)
+    depth_4_any = {
+        '@type': 'type.googleapis.com/google.protobuf.Any',
+        'value': {
+            '@type': 'type.googleapis.com/google.protobuf.Any',
+            'value': {
+                '@type': 'type.googleapis.com/google.protobuf.Any',
+                'value': {
+                    '@type': 'type.googleapis.com/google.protobuf.Any',
+                    'value': {},
+                },
+            },
+        },
+    }
+    # This should succeed: depth 4 < max_recursion_depth 5
+    json_format.ParseDict(depth_4_any, message, max_recursion_depth=5)
+
+    # Create nested Any at depth exactly 5 (should fail with max_recursion_depth=5)
+    depth_5_any = {
+        '@type': 'type.googleapis.com/google.protobuf.Any',
+        'value': {
+            '@type': 'type.googleapis.com/google.protobuf.Any',
+            'value': {
+                '@type': 'type.googleapis.com/google.protobuf.Any',
+                'value': {
+                    '@type': 'type.googleapis.com/google.protobuf.Any',
+                    'value': {
+                        '@type': 'type.googleapis.com/google.protobuf.Any',
+                        'value': {},
+                    },
+                },
+            },
+        },
+    }
+    # This should fail: depth 5 == max_recursion_depth 5 (exclusive limit)
+    self.assertRaisesRegex(
+        json_format.ParseError,
+        'Message too deep. Max recursion depth is 5',
+        json_format.ParseDict,
+        depth_5_any,
+        message,
+        max_recursion_depth=5,
+    )
+
   def testJsonNameConflictSerilize(self):
     message = more_messages_pb2.ConflictJsonName(value=2)
     self.assertEqual(
@@ -1738,6 +1927,61 @@ class JsonFormatTest(JsonFormatBase):
     text = ('{"a":' * num_recursions) + '""' + ('}' * num_recursions)
     with self.assertRaises(json_format.ParseError):
       json_format.Parse(text, json_format_proto3_pb2.TestMessage())
+
+  @parameterized.named_parameters(
+      (
+          'Default',
+          json_enumval_custom_string_pb2.Armor.ARMOR_GORGET,
+          'ARMOR_GORGET',
+      ),
+      (
+          'CustomString',
+          json_enumval_custom_string_pb2.Armor.ARMOR_GREAT_HELM,
+          'gr8 helm',
+      ),
+      (
+          'QuoteInMiddle',
+          json_enumval_custom_string_pb2.Armor.ARMOR_GAUNTLET,
+          'a"b',
+      ),
+      (
+          'DoubleQuote',
+          json_enumval_custom_string_pb2.Armor.ARMOR_PLATE,
+          '"plate"',
+      ),
+      ('EmptyString', json_enumval_custom_string_pb2.Armor.ARMOR_COIF, ''),
+      (
+          'Escaping',
+          json_enumval_custom_string_pb2.Armor.ARMOR_PAULDRON,
+          'p\taul\ndron',
+      ),
+  )
+  def testEnumValue(self, enum_value, expected_string):
+    msg = json_enumval_custom_string_pb2.Knight(armor=enum_value)
+    self.assertEqual(msg.armor, enum_value)
+
+    json_output = json_format.MessageToJson(msg)
+    self.assertEqual(
+        json.loads(json_output),
+        {'armor': expected_string},
+    )
+
+    # Roundtrip to make sure we can parse it back.
+    msg2 = json_enumval_custom_string_pb2.Knight()
+    json_format.Parse(json_output, msg2)
+    self.assertEqual(msg2.armor, enum_value)
+
+  def testEnumValueIntOverride(self):
+    msg = json_enumval_custom_string_pb2.Knight(
+        armor=json_enumval_custom_string_pb2.Armor.ARMOR_GREAT_HELM
+    )
+
+    # Int overrides always win.
+    self.assertEqual(
+        json.loads(json_format.MessageToJson(msg, use_integers_for_enums=True)),
+        {'armor': 1},
+    )
+
 
 if __name__ == '__main__':
   unittest.main()

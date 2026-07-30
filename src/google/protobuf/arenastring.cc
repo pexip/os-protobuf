@@ -33,7 +33,7 @@ namespace google {
 namespace protobuf {
 namespace internal {
 
-namespace  {
+namespace {
 
 // TaggedStringPtr::Flags uses the lower 2 bits as tags.
 // Enforce that allocated data aligns to at least 4 bytes, and that
@@ -72,15 +72,6 @@ const std::string& LazyString::Init() const {
 namespace {
 
 
-#if defined(NDEBUG) || !defined(GOOGLE_PROTOBUF_INTERNAL_DONATE_STEAL)
-
-class ScopedCheckPtrInvariants {
- public:
-  explicit ScopedCheckPtrInvariants(const TaggedStringPtr*) {}
-};
-
-#endif  // NDEBUG || !GOOGLE_PROTOBUF_INTERNAL_DONATE_STEAL
-
 // Creates a heap allocated std::string value.
 inline TaggedStringPtr CreateString(absl::string_view value) {
   TaggedStringPtr res;
@@ -100,6 +91,11 @@ TaggedStringPtr CreateArenaString(Arena& arena, absl::string_view s) {
 #endif  // !GOOGLE_PROTOBUF_INTERNAL_DONATE_STEAL
 
 }  // namespace
+
+class ScopedCheckPtrInvariants {
+ public:
+  explicit ScopedCheckPtrInvariants(const TaggedStringPtr*) {}
+};
 
 TaggedStringPtr TaggedStringPtr::ForceCopy(Arena* arena) const {
   return arena != nullptr ? CreateArenaString(*arena, *Get())
@@ -161,6 +157,7 @@ void ArenaStringPtr::Set(std::string&& value, Arena* arena) {
     NewString(arena, std::move(value));
   } else if (IsFixedSizeArena()) {
     std::string* current = tagged_ptr_.Get();
+    UnpoisonMemoryRegion(current, sizeof(*current));
     auto* s = new (current) std::string(std::move(value));
     arena->OwnDestructor(s);
     tagged_ptr_.SetMutableArena(s);
@@ -243,9 +240,7 @@ void ArenaStringPtr::SetAllocated(std::string* value, Arena* arena) {
   }
 }
 
-void ArenaStringPtr::Destroy() {
-  delete tagged_ptr_.GetIfAllocated();
-}
+void ArenaStringPtr::Destroy() { delete tagged_ptr_.GetIfAllocated(); }
 
 void ArenaStringPtr::ClearToEmpty() {
   ScopedCheckPtrInvariants check(&tagged_ptr_);
@@ -271,6 +266,7 @@ void ArenaStringPtr::ClearToDefault(const LazyString& default_value,
     UnsafeMutablePointer()->assign(default_value.get());
   }
 }
+
 
 const char* EpsCopyInputStream::ReadArenaString(const char* ptr,
                                                 ArenaStringPtr* s,

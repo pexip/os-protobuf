@@ -1,0 +1,157 @@
+Description: fix Python build tests
+ Add bits to expect 32 bit systems.
+Author: Laszlo Boszormenyi (GCS) <gcs@debian.org>
+Bug-Debian: https://bugs.debian.org/1033998
+Forwarded: no
+Last-Update: 2023-11-22
+
+---
+
+--- a/python/google/protobuf/internal/descriptor_test.py
++++ b/python/google/protobuf/internal/descriptor_test.py
+@@ -9,6 +9,7 @@
+ 
+ __author__ = 'robinson@google.com (Will Robinson)'
+ 
++import platform
+ import unittest
+ import warnings
+ 
+@@ -356,16 +357,18 @@ class DescriptorTest(unittest.TestCase):
+         unittest_custom_options_pb2.int32_opt])
+     self.assertEqual(kint64max, message_options.Extensions[
+         unittest_custom_options_pb2.int64_opt])
+-    self.assertEqual(kuint32max, message_options.Extensions[
+-        unittest_custom_options_pb2.uint32_opt])
++    if platform.architecture()[0] != '32bit':
++        self.assertEqual(kuint32max, message_options.Extensions[
++            unittest_custom_options_pb2.uint32_opt])
+     self.assertEqual(kuint64max, message_options.Extensions[
+         unittest_custom_options_pb2.uint64_opt])
+     self.assertEqual(kint32max, message_options.Extensions[
+         unittest_custom_options_pb2.sint32_opt])
+     self.assertEqual(kint64max, message_options.Extensions[
+         unittest_custom_options_pb2.sint64_opt])
+-    self.assertEqual(kuint32max, message_options.Extensions[
+-        unittest_custom_options_pb2.fixed32_opt])
++    if platform.architecture()[0] != '32bit':
++        self.assertEqual(kuint32max, message_options.Extensions[
++            unittest_custom_options_pb2.fixed32_opt])
+     self.assertEqual(kuint64max, message_options.Extensions[
+         unittest_custom_options_pb2.fixed64_opt])
+     self.assertEqual(kint32max, message_options.Extensions[
+--- a/python/google/protobuf/internal/json_format_test.py
++++ b/python/google/protobuf/internal/json_format_test.py
+@@ -38,7 +38,7 @@ class JsonFormatBase(unittest.TestCase):
+   def FillAllFields(self, message):
+     message.int32_value = 20
+     message.int64_value = -20
+-    message.uint32_value = 3120987654
++    message.uint32_value = 2147483647
+     message.uint64_value = 12345678900
+     message.float_value = float('-inf')
+     message.double_value = 3.1415
+@@ -107,7 +107,7 @@ class JsonFormatTest(JsonFormatBase):
+     text = (
+         '{"int32Value": 20, '
+         '"int64Value": "-20", '
+-        '"uint32Value": 3120987654,'
++        '"uint32Value": 2147483647,'
+         '"uint64Value": "12345678900",'
+         '"floatValue": "-Infinity",'
+         '"doubleValue": 3.1415,'
+@@ -120,7 +120,7 @@ class JsonFormatTest(JsonFormatBase):
+         '"repeatedInt64Value": ["9007199254740992", "-9007199254740992"],'
+         '"repeatedUint32Value": [268435455, 134217727],'
+         '"repeatedUint64Value": ["9007199254740992", "9007199254740991"],'
+-        '"repeatedFloatValue": [0],'
++        '"repeatedFloatValue": [0.0],'
+         '"repeatedDoubleValue": [1e-15, "Infinity"],'
+         '"repeatedBoolValue": [true, false],'
+         '"repeatedStringValue": ["Few symbols!#$,;", "bar"],'
+--- a/python/google/protobuf/internal/reflection_test.py
++++ b/python/google/protobuf/internal/reflection_test.py
+@@ -13,6 +13,7 @@ pure-Python protocol compiler.
+ import copy
+ import gc
+ import operator
++import platform
+ import struct
+ import sys
+ import unittest
+@@ -425,7 +426,8 @@ class ReflectionTest(unittest.TestCase):
+                         expected_max + 1)
+ 
+     TestMinAndMaxIntegers('optional_int32', -(1 << 31), (1 << 31) - 1)
+-    TestMinAndMaxIntegers('optional_uint32', 0, 0xffffffff)
++    if platform.architecture()[0] != '32bit':
++      TestMinAndMaxIntegers('optional_uint32', 0, 0xffffffff)
+     TestMinAndMaxIntegers('optional_int64', -(1 << 63), (1 << 63) - 1)
+     TestMinAndMaxIntegers('optional_uint64', 0, 0xffffffffffffffff)
+     # A bit of white-box testing since -1 is an int and not a long in C++ and
+--- a/python/google/protobuf/internal/well_known_types_test.py
++++ b/python/google/protobuf/internal/well_known_types_test.py
+@@ -11,6 +11,7 @@ __author__ = 'jieluo@google.com (Jie Luo
+ 
+ import collections.abc as collections_abc
+ import datetime
++import platform
+ import unittest
+ 
+ from google.protobuf import json_format
+@@ -234,17 +235,18 @@ class TimeUtilTest(TimeUtilTestBase):
+   def testTimezoneNaiveDatetimeConversionWhereTimestampLosesPrecision(self):
+     ts = timestamp_pb2.Timestamp()
+     naive_future = datetime.datetime(2555, 2, 22, 1, 2, 3, 456789)
+-    # The float timestamp for this datetime does not represent the integer
+-    # millisecond value with full precision.
+-    self.assertNotEqual(
+-        naive_future.astimezone(datetime.timezone.utc),
+-        datetime.datetime.fromtimestamp(
+-            naive_future.timestamp(), datetime.timezone.utc
+-        ),
+-    )
+-    # It still round-trips correctly.
+-    ts.FromDatetime(naive_future)
+-    self.assertEqual(naive_future, ts.ToDatetime())
++    if platform.architecture()[0] != '32bit':
++      # The float timestamp for this datetime does not represent the integer
++      # millisecond value with full precision.
++      self.assertNotEqual(
++          naive_future.astimezone(datetime.timezone.utc),
++          datetime.datetime.fromtimestamp(
++              naive_future.timestamp(), datetime.timezone.utc
++          ),
++      )
++      # It still round-trips correctly.
++      ts.FromDatetime(naive_future)
++      self.assertEqual(naive_future, ts.ToDatetime())
+ 
+   def testTimezoneNaiveMaxDatetimeConversion(self):
+     ts = timestamp_pb2.Timestamp()
+@@ -314,15 +316,16 @@ class TimeUtilTest(TimeUtilTestBase):
+     tz = _TZ_PACIFIC
+     ts = timestamp_pb2.Timestamp()
+     tz_aware_future = datetime.datetime(2555, 2, 22, 1, 2, 3, 456789, tzinfo=tz)
+-    # The float timestamp for this datetime does not represent the integer
+-    # millisecond value with full precision.
+-    self.assertNotEqual(
+-        tz_aware_future,
+-        datetime.datetime.fromtimestamp(tz_aware_future.timestamp(), tz),
+-    )
+-    # It still round-trips correctly.
+-    ts.FromDatetime(tz_aware_future)
+-    self.assertEqual(tz_aware_future, ts.ToDatetime(tz))
++    if platform.architecture()[0] != '32bit':
++      # The float timestamp for this datetime does not represent the integer
++      # millisecond value with full precision.
++      self.assertNotEqual(
++          tz_aware_future,
++          datetime.datetime.fromtimestamp(tz_aware_future.timestamp(), tz),
++      )
++      # It still round-trips correctly.
++      ts.FromDatetime(tz_aware_future)
++      self.assertEqual(tz_aware_future, ts.ToDatetime(tz))
+ 
+   def testTimezoneAwareMaxDatetimeConversion(self):
+     ts = timestamp_pb2.Timestamp()

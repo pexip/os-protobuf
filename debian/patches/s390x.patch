@@ -5,11 +5,10 @@ Author: Sebastiaan Couwenberg <sebastic@xs4all.nl>
 Description: Add support for s390x architecture.
  Based on port of Google V8 JavaScript engine to z Systems
 
-Index: protobuf/src/google/protobuf/stubs/platform_macros.h
-===================================================================
---- protobuf.orig/src/google/protobuf/stubs/platform_macros.h
-+++ protobuf/src/google/protobuf/stubs/platform_macros.h
-@@ -60,6 +60,13 @@
+--- a/src/google/protobuf/stubs/platform_macros.h
++++ b/src/google/protobuf/stubs/platform_macros.h
+@@ -82,8 +82,15 @@
+ #define GOOGLE_PROTOBUF_ARCH_64_BIT 1
  #elif defined(__PPC__)
  #define GOOGLE_PROTOBUF_ARCH_PPC 1
  #define GOOGLE_PROTOBUF_ARCH_32_BIT 1
@@ -23,3 +22,4 @@ Index: protobuf/src/google/protobuf/stubs/platform_macros.h
  #elif defined(__GNUC__)
  # if (((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7)) || (__GNUC__ > 4))
  // We fallback to the generic Clang/GCC >= 4.7 implementation in atomicops.h
+ # elif defined(__clang__)

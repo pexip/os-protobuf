@@ -13,31 +13,36 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "google/protobuf/testing/file.h"
 #include "google/protobuf/any.pb.h"
 #include "google/protobuf/descriptor.pb.h"
 #include <gmock/gmock.h>
 #include "google/protobuf/testing/googletest.h"
 #include <gtest/gtest.h>
+#include "absl/base/macros.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/log/absl_check.h"
 #include "absl/memory/memory.h"
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 #include "absl/strings/substitute.h"
-#include "google/protobuf/compiler/retention.h"
 #include "google/protobuf/descriptor.h"
+#include "google/protobuf/io/tokenizer.h"
+#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
 #include "google/protobuf/test_util2.h"
 #include "google/protobuf/text_format.h"
 #include "google/protobuf/unittest.pb.h"
 #include "google/protobuf/unittest_custom_options.pb.h"
 #include "google/protobuf/unittest_import.pb.h"
 #include "google/protobuf/unittest_import_public.pb.h"
-#include "google/protobuf/wire_format.h"
 
 
 // Must be included last.
@@ -48,6 +53,8 @@ namespace protobuf {
 namespace compiler {
 
 namespace {
+
+using ::testing::HasSubstr;
 
 class MockErrorCollector : public io::ErrorCollector {
  public:
@@ -100,10 +107,10 @@ class ParserTest : public testing::Test {
   // Set up the parser to parse the given text.
   void SetupParser(absl::string_view text) {
     raw_input_ =
-        absl::make_unique<io::ArrayInputStream>(text.data(), text.size());
+        std::make_unique<io::ArrayInputStream>(text.data(), text.size());
     input_ =
-        absl::make_unique<io::Tokenizer>(raw_input_.get(), &error_collector_);
-    parser_ = absl::make_unique<Parser>();
+        std::make_unique<io::Tokenizer>(raw_input_.get(), &error_collector_);
+    parser_ = std::make_unique<Parser>();
     parser_->RecordErrorsTo(&error_collector_);
     parser_->SetRequireSyntaxIdentifier(require_syntax_identifier_);
   }
@@ -232,8 +239,8 @@ TEST_F(ParserTest, WarnIfSyntaxIdentifierOmitted) {
   FileDescriptorProto file;
   CaptureTestStderr();
   EXPECT_TRUE(parser_->Parse(input_.get(), &file));
-  EXPECT_TRUE(GetCapturedTestStderr().find("No edition or syntax specified") !=
-              std::string::npos);
+  EXPECT_TRUE(absl::StrContains(GetCapturedTestStderr(),
+                                "No edition or syntax specified"));
 }
 
 TEST_F(ParserTest, RegressionNestedOpenBraceDoNotStackOverflow) {
@@ -334,6 +341,148 @@ TEST_F(ParseMessageTest, ExplicitRequiredSyntaxIdentifier) {
       "  field { name:\"foo\" label:LABEL_REQUIRED type:TYPE_INT32 number:1 }"
       "}");
   EXPECT_EQ("proto2", parser_->GetSyntaxIdentifier());
+}
+
+TEST_F(ParseMessageTest, AggregateValueWithoutNormalization) {
+  ExpectParsesTo(
+      R"schema(message TestMessage {
+option (foo) = {   a:
+  100  };
+})schema",
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: "   a:\n  100  "
+            }
+          }
+        }
+      )pb");
+}
+
+TEST_F(ParseMessageTest, AggregateValueComplex) {
+  ExpectParsesTo(
+      R"schema(message TestMessage {
+  option (foo) = {
+   outer: {
+      inner: 1
+    }
+  };
+})schema",
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: "\n   outer: {\n      inner: 1\n    }\n  "
+            }
+          }
+        }
+      )pb");
+}
+
+TEST_F(ParseMessageTest, AggregateValueTrailingWhitespace) {
+  ExpectParsesTo(
+      "message TestMessage {\n"
+      "  option (foo) = { a: 1    \n"
+      "    b: 2   };\n"
+      "}\n",
+
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: " a: 1    \n    b: 2   "
+            }
+          }
+        }
+      )pb");
+}
+
+TEST_F(ParseMessageTest, AggregateValueMultilineString) {
+  ExpectParsesTo(
+      "message TestMessage {\n"
+      "  option (foo) = { a: \"foo\"\n"
+      "                      \"bar\" };\n"
+      "}\n",
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: " a: \"foo\"\n                      \"bar\" "
+            }
+          }
+        }
+      )pb");
+}
+
+TEST_F(ParseMessageTest, AggregateValueWithInlineBlockComment) {
+  ExpectParsesTo(
+      "message TestMessage {\n"
+      "  option (foo) = { a: /* bla */ 1 };\n"
+      "}\n",
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: " a:           1 "
+            }
+          }
+        }
+      )pb");
+}
+
+TEST_F(ParseMessageTest, AggregateValueWithSingleLineComment) {
+  ExpectParsesTo(
+      "message TestMessage {\n"
+      "  option (foo) = {\n"
+      "    // This is a comment\n"
+      "    a: 1\n"
+      "  };\n"
+      "}\n",
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: "\n    \n    a: 1\n  "
+            }
+          }
+        }
+      )pb");
+}
+
+TEST_F(ParseMessageTest, AggregateValueWithMultilineBlockComment) {
+  ExpectParsesTo(
+      "message TestMessage {\n"
+      "  option (foo) = {\n"
+      "    /* line 1\n"
+      "       line 2\n"
+      "       line 3 */\n"
+      "    a: 1\n"
+      "  };\n"
+      "}\n",
+      R"pb(
+        message_type {
+          name: "TestMessage"
+          options {
+            uninterpreted_option {
+              name { name_part: "foo" is_extension: true }
+              aggregate_value: "\n    \n\n                \n    a: 1\n  "
+            }
+          }
+        }
+      )pb");
 }
 
 TEST_F(ParseMessageTest, SimpleFields) {
@@ -527,6 +676,503 @@ TEST_F(ParseMessageTest, FieldJsonName) {
       "    json_name: \"@type\"\n"
       "  }\n"
       "}\n");
+}
+
+TEST_F(ParseMessageTest, Varint32Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message NewVarintTypes {
+  varint32 value = 1;
+  })schema",
+      R"pb(message_type {
+             name: "NewVarintTypes"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_INT32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Varint32Edition2024Fails) {
+  ExpectHasValidationErrors(
+      R"schema(edition = "2024";
+message NewVarintTypes {
+  varint32 value = 1;
+})schema",
+      HasSubstr("\"varint32\" is not defined.\n"));
+}
+
+TEST_F(ParseMessageTest, Varint64Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message NewVarintTypes {
+  varint64 int64_field = 1;
+})schema",
+      R"pb(message_type {
+             name: "NewVarintTypes"
+             field {
+               name: "int64_field"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_INT64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Varint64Edition2024Fails) {
+  ExpectHasValidationErrors(
+      R"schema(edition = "2024";
+message NewVarintTypes {
+  varint64 int64_field = 1;
+})schema",
+      HasSubstr("\"varint64\" is not defined.\n"));
+}
+
+TEST_F(ParseMessageTest, Zigzag32Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message NewVarintTypes {
+  zigzag32 sint32_field = 1;
+})schema",
+      R"pb(message_type {
+             name: "NewVarintTypes"
+             field {
+               name: "sint32_field"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SINT32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Zigzag32Edition2024Fails) {
+  ExpectHasValidationErrors(
+      R"schema(edition = "2024";
+message NewVarintTypes {
+  zigzag32 sint32_field = 1;
+})schema",
+      HasSubstr("\"zigzag32\" is not defined.\n"));
+}
+
+TEST_F(ParseMessageTest, Zigzag64Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message NewVarintTypes {
+  zigzag64 sint64_field = 1;
+})schema",
+      R"pb(message_type {
+             name: "NewVarintTypes"
+             field {
+               name: "sint64_field"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SINT64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Zigzag64Edition2024Fails) {
+  ExpectHasValidationErrors(
+      R"schema(edition = "2024";
+message NewVarintTypes {
+  zigzag64 sint64_field = 1;
+})schema",
+      HasSubstr("\"zigzag64\" is not defined.\n"));
+}
+
+TEST_F(ParseMessageTest, Uvarint32Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message NewVarintTypes {
+  uvarint32 uint32_field = 1;
+})schema",
+      R"pb(message_type {
+             name: "NewVarintTypes"
+             field {
+               name: "uint32_field"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_UINT32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Uvarint32Edition2024Fails) {
+  ExpectHasValidationErrors(
+      R"schema(edition = "2024";
+message NewVarintTypes {
+  uvarint32 uint32_field = 1;
+})schema",
+      HasSubstr("\"uvarint32\" is not defined.\n"));
+}
+
+TEST_F(ParseMessageTest, Uvarint64Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message NewVarintTypes {
+  uvarint64 uint64_field = 1;
+})schema",
+      R"pb(message_type {
+             name: "NewVarintTypes"
+             field {
+               name: "uint64_field"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_UINT64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Uvarint64Edition2024Fails) {
+  ExpectHasValidationErrors(
+      R"schema(edition = "2024";
+message NewVarintTypes {
+  uvarint64 uint64_field = 1;
+})schema",
+      HasSubstr("\"uvarint64\" is not defined.\n"));
+}
+
+TEST_F(ParseMessageTest, Int32Unstable) {
+  ExpectParsesTo(
+      R"schema(
+edition = "UNSTABLE";
+message Test {
+  int32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SFIXED32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Int32Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  int32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_INT32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, UInt32Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  uint32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_FIXED32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, UInt32Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  uint32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_UINT32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Int64Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  int64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SFIXED64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, Int64Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  int64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_INT64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, UInt64Unstable) {
+  ExpectParsesTo(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  uint64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_FIXED64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_UNSTABLE)pb");
+}
+
+TEST_F(ParseMessageTest, UInt64Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  uint64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_UINT64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Fixed32Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  fixed32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_FIXED32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Fixed32UnstableFails) {
+  ExpectHasEarlyExitErrors(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  fixed32 value = 1;
+})schema",
+      HasSubstr("Type 'fixed32' is obsolete in unstable editions, use 'uint32' "
+                "instead.\n"));
+}
+
+TEST_F(ParseMessageTest, Fixed64Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  fixed64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_FIXED64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Fixed64UnstableFails) {
+  ExpectHasEarlyExitErrors(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  fixed64 value = 1;
+})schema",
+      HasSubstr("Type 'fixed64' is obsolete in unstable editions, use 'uint64' "
+                "instead.\n"));
+}
+
+TEST_F(ParseMessageTest, Sfixed32Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  sfixed32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SFIXED32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Sfixed32UnstableFails) {
+  ExpectHasEarlyExitErrors(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  sfixed32 value = 1;
+})schema",
+      HasSubstr("Type 'sfixed32' is obsolete in unstable editions, use 'int32' "
+                "instead.\n"));
+}
+
+TEST_F(ParseMessageTest, Sfixed64Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  sfixed64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SFIXED64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Sfixed64UnstableFails) {
+  ExpectHasEarlyExitErrors(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  sfixed64 value = 1;
+})schema",
+      HasSubstr("Type 'sfixed64' is obsolete in unstable editions, use 'int64' "
+                "instead.\n"));
+}
+
+TEST_F(ParseMessageTest, Sint32Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  sint32 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SINT32
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Sint32UnstableFails) {
+  ExpectHasEarlyExitErrors(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  sint32 value = 1;
+})schema",
+      HasSubstr(
+          "Type 'sint32' is obsolete in unstable editions, use 'zigzag32' "
+          "instead.\n"));
+}
+
+TEST_F(ParseMessageTest, Sint64Edition2024) {
+  ExpectParsesTo(
+      R"schema(edition = "2024";
+message Test {
+  sint64 value = 1;
+})schema",
+      R"pb(message_type {
+             name: "Test"
+             field {
+               name: "value"
+               number: 1
+               label: LABEL_OPTIONAL
+               type: TYPE_SINT64
+             }
+           }
+           syntax: "editions"
+           edition: EDITION_2024)pb");
+}
+
+TEST_F(ParseMessageTest, Sint64UnstableFails) {
+  ExpectHasEarlyExitErrors(
+      R"schema(edition = "UNSTABLE";
+message Test {
+  sint64 value = 1;
+})schema",
+      HasSubstr(
+          "Type 'sint64' is obsolete in unstable editions, use 'zigzag64' "
+          "instead.\n"));
 }
 
 TEST_F(ParseMessageTest, FieldOptions) {
@@ -1198,8 +1844,8 @@ TEST_F(ParseMessageTest, CanHandleErrorOnFirstToken) {
   ExpectHasEarlyExitErrors(
       "/",
       "0:0: Expected top-level statement (e.g. \"message\").\n"
-      "0:0: File must begin with a syntax statement, e.g. 'syntax = "
-      "\"proto2\";'.\n");
+      "0:0: File must begin with an edition or syntax statement, "
+      "e.g. 'edition = \"2023\";'.\n");
 }
 
 // ===================================================================
@@ -1562,9 +2208,10 @@ typedef ParserTest ParseErrorTest;
 
 TEST_F(ParseErrorTest, MissingSyntaxIdentifier) {
   require_syntax_identifier_ = true;
-  ExpectHasEarlyExitErrors("message TestMessage {}",
-                           "0:0: File must begin with a syntax statement, e.g. "
-                           "'syntax = \"proto2\";'.\n");
+  ExpectHasEarlyExitErrors(
+      "message TestMessage {}",
+      "0:0: File must begin with an edition or syntax statement, e.g. "
+      "'edition = \"2023\";'.\n");
   EXPECT_EQ("", parser_->GetSyntaxIdentifier());
 }
 
@@ -2131,6 +2778,30 @@ TEST_F(ParseErrorTest, ReservedNumberOutOfRange) {
       "1:11: Integer out of range.\n");
 }
 
+TEST_F(ParseErrorTest, ReservedMaxInt) {
+  ExpectHasErrors(
+      "message Foo {\n"
+      "  reserved 2147483647;\n"
+      "}\n",
+      "1:21: Field number out of bounds.\n");
+}
+
+TEST_F(ParseErrorTest, ReservedRangeMaxInt) {
+  ExpectHasErrors(
+      "message Foo {\n"
+      "  reserved 1 to 2147483647;\n"
+      "}\n",
+      "1:26: Field number out of bounds.\n");
+}
+
+TEST_F(ParseErrorTest, ReservedMaxIntOctal) {
+  ExpectHasErrors(
+      "message Foo {\n"
+      "  reserved 017777777777;\n"
+      "}\n",
+      "1:23: Field number out of bounds.\n");
+}
+
 // -------------------------------------------------------------------
 // Service errors
 
@@ -2201,6 +2872,16 @@ TEST_F(ParseErrorTest, OptionImportBefore2024) {
         import option "foo.proto";
       )schema",
       "2:15: option import is not supported before edition 2024.\n");
+}
+
+TEST_F(ParseErrorTest, WeakImportAfter2024) {
+  ExpectHasErrors(
+      R"schema(
+        edition = "2024";
+        import weak "foo.proto";
+      )schema",
+      "2:15: weak import is not supported in edition 2024 and above. Consider "
+      "using option import instead.\n");
 }
 
 // ===================================================================
@@ -2410,7 +3091,8 @@ TEST_F(ParserValidationErrorTest, FileOptionNameError) {
   ExpectHasValidationErrors(
       "option foo = 5;",
       "0:7: Option \"foo\" unknown. Ensure that your proto definition file "
-      "imports the proto which defines the option (i.e. via import option).\n");
+      "imports the proto which defines the option (i.e. via import option "
+      "after edition 2024).\n");
 }
 
 TEST_F(ParserValidationErrorTest, FileOptionValueError) {
@@ -2426,7 +3108,8 @@ TEST_F(ParserValidationErrorTest, FieldOptionNameError) {
       "  optional bool bar = 1 [foo=1];\n"
       "}\n",
       "1:25: Option \"foo\" unknown. Ensure that your proto definition file "
-      "imports the proto which defines the option (i.e. via import option).\n");
+      "imports the proto which defines the option (i.e. via import option "
+      "after edition 2024).\n");
 }
 
 TEST_F(ParserValidationErrorTest, FieldOptionValueError) {
@@ -3175,7 +3858,7 @@ TEST_F(ParseDescriptorDebugTest, TestCommentsInDebugString) {
     const std::string debug_string =
         descriptor->DebugStringWithOptions(debug_string_options);
 
-    for (int i = 0; i < ABSL_ARRAYSIZE(expected_comments); ++i) {
+    for (size_t i = 0; i < ABSL_ARRAYSIZE(expected_comments); ++i) {
       std::string::size_type found_pos =
           debug_string.find(expected_comments[i]);
       EXPECT_TRUE(found_pos != std::string::npos)
@@ -3210,9 +3893,9 @@ TEST_F(ParseDescriptorDebugTest, TestMaps) {
   // Make sure the debug string uses map syntax and does not have the auto
   // generated entry.
   std::string debug_string = file->DebugString();
-  EXPECT_TRUE(debug_string.find("map<") != std::string::npos);
-  EXPECT_TRUE(debug_string.find("option map_entry") == std::string::npos);
-  EXPECT_TRUE(debug_string.find("MapEntry") == std::string::npos);
+  EXPECT_TRUE(absl::StrContains(debug_string, "map<"));
+  EXPECT_TRUE(!absl::StrContains(debug_string, "option map_entry"));
+  EXPECT_TRUE(!absl::StrContains(debug_string, "MapEntry"));
 
   // Make sure the descriptor debug string is parsable.
   FileDescriptorProto parsed;
@@ -3553,17 +4236,16 @@ class SourceInfoTest : public ParserTest {
 
 TEST_F(SourceInfoTest, BasicFileDecls) {
   EXPECT_TRUE(
-      Parse("$a$edition = \"2024\";$i$\n"
+      Parse("$a$edition = \"2023\";$i$\n"
             "$b$package foo.bar;$c$\n"
             "$d$import \"baz.proto\";$e$\n"
             "$f$import\"qux.proto\";$h$\n"
             "$j$import $k$public$l$ \"bar.proto\";$m$\n"
             "$n$import $o$weak$p$ \"bar.proto\";$q$\n"
-            "$r$import option \"bar.proto\";$s$\n"
             "\n"
             "// comment ignored\n"));
 
-  EXPECT_TRUE(HasSpan('a', 's', file_));
+  EXPECT_TRUE(HasSpan('a', 'q', file_));
   EXPECT_TRUE(HasSpan('b', 'c', file_, "package"));
   EXPECT_TRUE(HasSpan('d', 'e', file_, "dependency", 0));
   EXPECT_TRUE(HasSpan('f', 'h', file_, "dependency", 1));
@@ -3571,7 +4253,27 @@ TEST_F(SourceInfoTest, BasicFileDecls) {
   EXPECT_TRUE(HasSpan('k', 'l', file_, "public_dependency", 0));
   EXPECT_TRUE(HasSpan('n', 'q', file_, "dependency", 3));
   EXPECT_TRUE(HasSpan('o', 'p', file_, "weak_dependency", 0));
-  EXPECT_TRUE(HasSpan('r', 's', file_, "option_dependency", 0));
+  EXPECT_TRUE(HasSpan('a', 'i', file_, "syntax"));
+}
+
+TEST_F(SourceInfoTest, BasicFileDecls_Edition2024) {
+  EXPECT_TRUE(
+      Parse("$a$edition = \"2024\";$i$\n"
+            "$b$package foo.bar;$c$\n"
+            "$d$import \"baz.proto\";$e$\n"
+            "$f$import\"qux.proto\";$h$\n"
+            "$j$import $k$public$l$ \"bar.proto\";$m$\n"
+            "$n$import option \"bar.proto\";$o$\n"
+            "\n"
+            "// comment ignored\n"));
+
+  EXPECT_TRUE(HasSpan('a', 'o', file_));
+  EXPECT_TRUE(HasSpan('b', 'c', file_, "package"));
+  EXPECT_TRUE(HasSpan('d', 'e', file_, "dependency", 0));
+  EXPECT_TRUE(HasSpan('f', 'h', file_, "dependency", 1));
+  EXPECT_TRUE(HasSpan('j', 'm', file_, "dependency", 2));
+  EXPECT_TRUE(HasSpan('k', 'l', file_, "public_dependency", 0));
+  EXPECT_TRUE(HasSpan('n', 'o', file_, "option_dependency", 0));
   EXPECT_TRUE(HasSpan('a', 'i', file_, "syntax"));
 }
 

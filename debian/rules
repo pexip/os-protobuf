@@ -2,23 +2,30 @@
 # -*- makefile -*-
 
 # Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+export DH_VERBOSE=1
 
 include /usr/share/dpkg/architecture.mk
 include /usr/share/dpkg/buildtools.mk
 
 export DH_RUBY = --gem-install
 export DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR = debian/ruby-google-protobuf
+export DH_RUBY_GEM_INSTALL_INCLUDE = src/* tests/* google-protobuf.gemspec generate_stubs.rb
 export GEM2DEB_TEST_RUNNER = --check-dependencies
+#export PROTOCOL_BUFFERS_RUBY_IMPLEMENTATION=FFI
+export PROTOCOL_BUFFERS_RUBY_IMPLEMENTATION=NATIVE
+RUBY_PKG_DIR = $(CURDIR)/debian/ruby-google-protobuf
 
 ifneq (,$(findstring $(DEB_BUILD_ARCH), armel m68k mips mipsel powerpc powerpcspe sh4))
 export DEB_LDFLAGS_MAINT_APPEND  = -latomic
 endif
 
-# Pexip - no ruby
-export DEB_BUILD_PROFILES=noruby
+# faster than the pure-python alternative
+# not yet ported to Python 3.14
+#PYTHON_CPP=--cpp_implementation
+# Pexip - no ruby or java
+export DEB_BUILD_PROFILES = noruby nojava
 
-SONAME=31
+SONAME=36
 API_VERSION=$(SONAME)-0
 
 %:
@@ -26,8 +33,10 @@ API_VERSION=$(SONAME)-0
 
 override_dh_clean:
 	$(RM) -rv gmock $(CURDIR)/build-static/ $(CURDIR)/build-shared/
+	$(RM) -rv $(CURDIR)/java/core/target/ $(CURDIR)/java/util/target/
 ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
-	sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+	sed 's|ext/|ruby/ext/|;s|tests/|ruby/tests/|' \
+		$(CURDIR)/ruby/google-protobuf.gemspec \
 		>$(CURDIR)/google-protobuf.gemspec
 	cd ruby && rake clobber
 endif
@@ -37,6 +46,8 @@ endif
 	$(RM) google-protobuf.gemspec
 	$(RM) src/protoc
 	$(RM) libtool stamp-h1
+	$(RM) php/src/GPBMetadata/Google/Protobuf/Type.php
+	$(RM) -r python/build/
 	$(RM) ruby/tests/basic_test_pb.rb \
 		ruby/tests/basic_test_proto2_pb.rb \
 		ruby/tests/generated_code_pb.rb \
@@ -53,7 +64,7 @@ override_dh_auto_configure:
 ifneq ($(DEB_BUILD_ARCH),$(DEB_HOST_ARCH))
 	# build for the native (i.e. build) architecture, as we need
 	# the protoc compiler for the native arch.
-	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=ON -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF
+	dpkg-architecture -f -a$(DEB_BUILD_ARCH) -c dh_auto_configure -- -DBUILD_SHARED_LIBS=ON -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF
 
 PYTHON_CROSS_VARS += PROTOC=$(CURDIR)/debian/run_protoc
 PYTHON_CROSS_VARS += PYTHONPATH=/usr/lib/python$$pv/plat-$(DEB_HOST_MULTIARCH)
@@ -61,8 +72,8 @@ PYTHON_CROSS_VARS += _PYTHON_HOST_PLATFORM=$(DEB_HOST_ARCH_OS)-$(DEB_HOST_GNU_CP
 PYTHON_CROSS_VARS += CC=$(CXX)
 PYTHON_CROSS_VARS += CXX=$(CXX)
 else
-	dh_auto_configure --builddir=build-static/ -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
-	dh_auto_configure --builddir=build-shared/ -- -DCMAKE_CXX_STANDARD=17 -DBUILD_SHARED_LIBS=ON  -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
+	dh_auto_configure --builddir=build-static/ -- -DBUILD_SHARED_LIBS=OFF -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
+	dh_auto_configure --builddir=build-shared/ -- -DBUILD_SHARED_LIBS=ON  -Dprotobuf_ABSL_PROVIDER=package -Dprotobuf_BUILD_TESTS=OFF -Dprotobuf_USE_EXTERNAL_GTEST=ON
 endif
 
 override_dh_auto_build-arch:
@@ -91,88 +102,41 @@ endif
 
 ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 build
-	# Build the pb2 files before running setup
-	for proto in any api compiler/plugin descriptor duration empty field_mask source_context struct timestamp type wrappers; do \
-		build-static/protoc -I src --python_out=python/ src/google/protobuf/$${proto}.proto; \
-	done
-	# Build the version file
-	mkdir -p $(CURDIR)/tmp-python
-	# This needs to be kept in sync with python/build_targets.bzl
-	build-static/protoc \
-		--edition_defaults_out $(CURDIR)/tmp-python/python_defaults.pb \
-		--edition_defaults_minimum PROTO2 \
-		--edition_defaults_maximum 2023 \
-		src/google/protobuf/descriptor.proto
-	# Now merge this info into the template; need to build the tool
-	$(CXX) -o editions/internal_defaults_escape \
-		editions/internal_defaults_escape.cc \
-		-I$(CURDIR)/src \
-		-Lbuild-shared -lprotobuf \
-		$(shell pkg-config --libs absl_strings absl_log_internal_check_op absl_log_internal_nullguard absl_absl_log absl_flags_parse absl_flags)
-
-	# Generate the template
-	LD_LIBRARY_PATH=$(CURDIR)/build-shared editions/internal_defaults_escape \
-		--encoding=octal \
-		--defaults_path=$(CURDIR)/tmp-python/python_defaults.pb \
-		--template_path=python/google/protobuf/internal/python_edition_defaults.py.template \
-		--placeholder=DEFAULTS_VALUE \
-		--output_path=python/google/protobuf/internal/python_edition_defaults.py
-
-#	cp -rv python python3
+	cp -rv python python3
+	cp -v $(CURDIR)/debian/python/setup.py \
+		$(CURDIR)/python3/
 #	export LDFLAGS=-L$(CURDIR)/build-shared/;
-	cp python/dist/setup.py python/
 	set -e; \
-	cd python && for pv in $(shell py3versions -vr); do \
+	cd python3 && for pv in $(shell py3versions -vr); do \
 		$(PYTHON_CROSS_VARS) \
 		LDFLAGS=-L$(CURDIR)/build-shared/ \
 		PROTOC=$(CURDIR)/build-shared/protoc \
-		python$$pv setup.py build; \
+		python$$pv setup.py build ${PYTHON_CPP}; \
 	done
 endif
 
 ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
 	# Ruby build
-	sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+	sed 's|ext/|ruby/ext/|;s|tests/|ruby/tests/|' \
+		$(CURDIR)/ruby/google-protobuf.gemspec \
 		>$(CURDIR)/google-protobuf.gemspec
 	cd ruby && \
-	PROTOC=$(CURDIR)/build-shared/protoc \
-	rake package genproto
+		PROTOC=$(CURDIR)/build-shared/protoc \
+		rake package genproto
+#		rake package gem
 endif
 
 override_dh_auto_build-indep:
 	dh_auto_build --builddir=build-shared/ --indep
 
-    # Pexip - we don't want a java build
 	# Java build will use this path for protoc, maybe set PROTOC?
-	#ln -s $(CURDIR)/build-shared/protoc $(CURDIR)/src/
+ifeq (,$(filter nojava,$(DEB_BUILD_PROFILES)))
+	ln -s $(CURDIR)/build-shared/protoc $(CURDIR)/src/
+	# Generate JavaFeaturesProto.java
+	$(CURDIR)/src/protoc --java_out=$(CURDIR)/java/core/src/main/java/ -I$(CURDIR)/java/core/src -I$(CURDIR)/src $(CURDIR)/java/core/src/main/resources/google/protobuf/java_features.proto
 	# Java build
-	#ant -f debian/java-build.xml jar jar-util
-
-override_dh_clean:
-	$(RM) -rv gmock
-ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
-	cd ruby && rake clobber
+	ant -f debian/java-build.xml jar jar-util
 endif
-	dh_clean
-	$(RM) config.h config.log config.status
-	$(RM) *.pc
-	$(RM) google-protobuf.gemspec
-	$(RM) libtool stamp-h1
-	$(RM) ruby/tests/basic_test_pb.rb \
-		ruby/tests/basic_test_proto2_pb.rb \
-		ruby/tests/generated_code_pb.rb \
-		ruby/tests/generated_code_proto2_pb.rb \
-		ruby/tests/google/protobuf/wrappers_pb.rb \
-		ruby/tests/test_import_pb.rb \
-		ruby/tests/test_import_proto2_pb.rb \
-		ruby/tests/test_ruby_package_pb.rb \
-		ruby/tests/test_ruby_package_proto2_pb.rb
-	$(RM) -r ruby/ext/google/protobuf_c/third_party/utf8_range/
-	find $(CURDIR) -name Makefile -delete
-	$(RM) -f python/setup.py
-	$(RM) -fr $(CURDIR)/tmp-python
-	$(RM) -f editions/internal_defaults_escape
-	$(RM) -f python/google/protobuf/internal/python_edition_defaults.py
 
 override_dh_auto_test-arch:
 	dh_auto_test --builddir=build-shared/ --arch
@@ -182,9 +146,15 @@ ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS))$(filter nopython,$(DEB_BUILD_PROFI
 #	set -e; \
 	cd python && for PYTHON in $(shell py3versions -r); do \
 		LD_LIBRARY_PATH=$(CURDIR)/build-shared/ \
-		$$PYTHON setup.py test; \
+		$$PYTHON setup.py test ${PYTHON_CPP}; \
 	done
 	@echo Python testing is gone...
+endif
+
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS))$(filter noruby,$(DEB_BUILD_PROFILES)))
+	cd ruby && \
+		PROTOC=$(CURDIR)/build-shared/protoc \
+		rake gc_test
 endif
 
 override_dh_auto_test-indep:
@@ -194,15 +164,16 @@ override_dh_auto_clean-arch:
 	dh_auto_clean --arch
 
 	# Python3 clean
-	#$(RM) -r $(CURDIR)/python3
+	$(RM) -r $(CURDIR)/python3
 
 override_dh_auto_clean-indep:
 	dh_auto_clean --indep
 
-	# Pexip - no java
+ifeq (,$(filter nojava,$(DEB_BUILD_PROFILES)))
 	# Java clean
-	#ant -f debian/java-build.xml clean || true
-	#mh_clean || true
+	ant -f debian/java-build.xml clean || true
+	mh_clean || true
+endif
 
 override_dh_auto_install-arch:
 	dh_auto_install --builddir=build-static/ --arch
@@ -211,8 +182,8 @@ override_dh_auto_install-arch:
 ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	# Python3 install
 	set -e; \
-	cd python && for pv in $(shell py3versions -vr); do \
-		$(PYTHON_CROSS_VARS) python$$pv setup.py install \
+	cd python3 && for pv in $(shell py3versions -vr); do \
+		$(PYTHON_CROSS_VARS) python$$pv setup.py install ${PYTHON_CPP} \
 			--install-layout=deb --no-compile \
 			--root=$(CURDIR)/debian/python3-protobuf; \
 	done
@@ -220,43 +191,42 @@ ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 endif
 
 ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
+	# Fix missing files
+	for rubyver in $(shell dh_ruby --print-supported); do \
+		RUBY_API_VERSION=$$(/usr/bin/$$rubyver -e "print Gem.extension_api_version"); \
+		GEM_DEST_DIR="$(CURDIR)/debian/ruby-google-protobuf/usr/lib/$(DEB_HOST_MULTIARCH)/rubygems-integration/$$RUBY_API_VERSION/gems"; \
+		mkdir -p "$$GEM_DEST_DIR"; \
+		rm -f "$$GEM_DEST_DIR/src"; \
+		ln -s $(CURDIR)/src "$$GEM_DEST_DIR/src"; \
+	done
+
 	# Ruby install
-	 sed 's|ext/|ruby/ext/|' $(CURDIR)/ruby/google-protobuf.gemspec \
+	 sed 's|ext/|ruby/ext/|;s|tests/|ruby/tests/|' \
+		 $(CURDIR)/ruby/google-protobuf.gemspec \
 		 >$(CURDIR)/google-protobuf.gemspec
+	PATH=../src:$(PATH) \
 	dh_auto_install -O--buildsystem=ruby -O--package=ruby-google-protobuf --destdir=$(CURDIR)/debian/ruby-google-protobuf
+
 	find $(CURDIR)/debian/ruby-google-protobuf/usr/lib/ \
-		-name well_known_types.rb -exec chmod a+x {} \;
+		-name descriptor_dsl.rb -o -name well_known_types.rb \
+		-exec chmod a+x {} \;
 endif
 
 override_dh_auto_install-indep:
 	dh_auto_install --builddir=build-shared/ --indep
 
-	# Pexip - no java
+ifeq (,$(filter nojava,$(DEB_BUILD_PROFILES)))
 	# Java install
-	#mh_install
+	mh_install
+endif
 
 override_dh_install-arch:
-	# Do some horrible hackups of the cmake files.  This is necessary to
-	# avoid linker issues around libupb; we remove all mentions of it from
-	# the cmake files.  Maybe one day, Google devs will learn about library
-	# API/ABI stability and stop behaving like webdevs.
-	sed -i '/^foreach/ s@protobuf::libupb @@' \
-		$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/cmake/protobuf/protobuf-targets.cmake
-	sed -i '/INTERFACE_LINK_LIBRARIES/ s@protobuf::libupb;@@' \
-		$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/cmake/protobuf/protobuf-targets.cmake
-
-	# This is incredibly fragile; take care when upgrading
-	sed -i '/^set_target_properties(protobuf::libupb/,+4d' \
-		$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/cmake/protobuf/protobuf-targets.cmake
-	sed -i '/protobuf::libupb/d' \
-		$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/cmake/protobuf/protobuf-targets.cmake
-
-	sed -i '/^set_target_properties(protobuf::libupb/,+4d' \
-		$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/cmake/protobuf/protobuf-targets-none.cmake
-	sed -i '/protobuf::libupb/d' \
-		$(CURDIR)/debian/tmp/usr/lib/$(DEB_HOST_MULTIARCH)/cmake/protobuf/protobuf-targets-none.cmake
-
 	dh_install --arch
+
+ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
+	install -m0644 ruby/lib/google/*.so \
+		$(RUBY_PKG_DIR)/usr/lib/$(DEB_BUILD_MULTIARCH)/rubygems-integration/*/extensions/*/*/google-protobuf-*/
+endif
 
 	# Convert doc dir to symlink for the -dev packages
 	$(RM) -r $(CURDIR)/debian/libprotobuf-dev/usr/share/doc/libprotobuf-dev
@@ -279,10 +249,12 @@ override_dh_installdocs-indep:
 	dh_installdocs -Xprotobuf-mode.el  # in protobuf-mode-el
 
 execute_after_dh_link-indep:
-	#jh_installlibs
-	#jh_classpath
-	#jh_manifest
-	#jh_depends
+ifeq (,$(filter nojava,$(DEB_BUILD_PROFILES)))
+	jh_installlibs
+	jh_classpath
+	jh_manifest
+	jh_depends
+endif
 
 override_dh_gencontrol:
 	dh_gencontrol -- -Vpb:API=${API_VERSION}
