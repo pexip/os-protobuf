@@ -237,6 +237,12 @@ endif
 	# Remove compiler headers from libprotobuf-dev
 	$(RM) -r $(CURDIR)/debian/libprotobuf-dev/usr/include/google/protobuf/compiler
 
+	# Install python compiler headers in libprotoc-dev which do not otherwise get
+	# installed but are needed for building python-grpcio_tools in grpc
+	install -m0755 -d $(CURDIR)/debian/libprotoc-dev/usr/include/google/protobuf/compiler/python
+	install -m0644 $(CURDIR)/src/google/protobuf/compiler/python/*.h \
+		$(CURDIR)/debian/libprotoc-dev/usr/include/google/protobuf/compiler/python/
+
 override_dh_installdocs-arch:
 	dh_installdocs --arch
 	# Fix permission
