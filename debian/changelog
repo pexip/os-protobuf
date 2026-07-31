@@ -1,3 +1,9 @@
+protobuf (36.0~rc1-1+pexip25u1) pexip-trixie; urgency=medium
+
+  * New upstream release.
+
+ -- Mark Hymers <mark.hymers@pexip.com>  Fri, 31 Jul 2026 16:45:10 +0100
+
 protobuf (36.0~rc1-1) experimental; urgency=medium
 
   * New major upstream release.
