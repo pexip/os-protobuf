@@ -111,10 +111,10 @@ ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 	        src/google/protobuf/descriptor.proto
 	# Now merge this info into the template; need to build the tool
 	$(CXX) -I$(CURDIR)/src \
-		-o editions/internal_defaults_escape \
+	        -o editions/internal_defaults_escape \
 	        editions/internal_defaults_escape.cc \
-		-Lbuild-shared -lprotobuf \
-	        $(shell pkg-config --libs absl_strings absl_log_internal_nullguard absl_log_internal absl_absl_log absl_flags_parse absl_flags)
+	        -Lbuild-shared -lprotobuf \
+	        $(shell pkg-config --libs absl_strings absl_log_internal_nullguard absl_log_internal_check_op absl_absl_log absl_flags_parse absl_flags)
 
 	# Generate the template
 	LD_LIBRARY_PATH=$(CURDIR)/build-shared editions/internal_defaults_escape \
