@@ -101,6 +101,26 @@ endif
 	xmlto man debian/protoc.xml
 
 ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
+	# Build the version file
+	mkdir -p $(CURDIR)/tmp-python
+	# This needs to be kept in sync with python/build_targets.bzl
+	build-static/protoc \
+	        --edition_defaults_out $(CURDIR)/tmp-python/python_defaults.pb \
+	        --edition_defaults_minimum PROTO2 \
+	        --edition_defaults_maximum 2026 \
+	        src/google/protobuf/descriptor.proto
+	# Now merge this info into the template; need to build the tool
+	$(CXX) -o editions/internal_defaults_escape \
+	        editions/internal_defaults_escape.cc -Lbuild-shared -lprotobuf \
+	        $(shell pkg-config --libs absl_strings absl_log_internal_nullguard absl_absl_log absl_flags_parse absl_flags)
+
+	# Generate the template
+	LD_LIBRARY_PATH=$(CURDIR)/build-shared editions/internal_defaults_escape \
+	        --encoding=octal \
+	        --defaults_path=$(CURDIR)/tmp-python/python_defaults.pb \
+	        --template_path=python/google/protobuf/internal/python_edition_defaults.py.template \
+	        --placeholder=DEFAULTS_VALUE \
+	        --output_path=python/google/protobuf/internal/python_edition_defaults.py
 	# Python3 build
 	cp -rv python python3
 	cp -v $(CURDIR)/debian/python/setup.py \
@@ -188,6 +208,9 @@ ifeq (,$(filter nopython,$(DEB_BUILD_PROFILES)))
 			--root=$(CURDIR)/debian/python3-protobuf; \
 	done
 	find $(CURDIR)/debian/python3-protobuf -name 'protobuf-*-nspkg.pth' -delete
+	$(RM) -fr $(CURDIR)/tmp-python
+	$(RM) -f editions/internal_defaults_escape
+	$(RM) -f python/google/protobuf/internal/python_edition_defaults.py
 endif
 
 ifeq (,$(filter noruby,$(DEB_BUILD_PROFILES)))
