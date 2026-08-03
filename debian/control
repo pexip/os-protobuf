@@ -13,6 +13,7 @@ Build-Depends: dpkg-dev (>= 1.22.5),
  , libutf8-range-dev
  , libgmock-dev <!nocheck>
  , libgtest-dev <!nocheck>
+ , pkgconf,
 # Python
  , dh-sequence-python3 <!nopython>
  , python3-all:any <!nopython>
